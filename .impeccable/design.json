@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-06T00:00:00Z",
+  "title": "Design System: 小说转剧本工作台",
+  "extensions": {
+    "colorMeta": {
+      "cinnabar": { "role": "primary", "displayName": "Cinnabar Seal", "canonical": "oklch(54% 0.16 28)", "tonalRamp": ["#2d0e0b", "#4d1813", "#6c221c", "#8f2c25", "#b23a30", "#cc6258", "#e09a92", "#f0cfc9"] },
+      "jade": { "role": "secondary", "displayName": "Faithful Jade", "canonical": "oklch(52% 0.04 150)", "tonalRamp": ["#1d241d", "#30392f", "#445242", "#5a6f5a", "#7c9079", "#a0b09c", "#c5d0c1", "#e6ece4"] },
+      "gold": { "role": "tertiary", "displayName": "Inference Gold", "canonical": "oklch(60% 0.10 85)", "tonalRamp": ["#2a200a", "#473712", "#65501c", "#856927", "#a6802f", "#c4a35a", "#dcc592", "#efe4c9"] },
+      "ink": { "role": "neutral", "displayName": "Brush Ink", "canonical": "oklch(20% 0.01 60)", "tonalRamp": ["#211b16", "#332b22", "#4a4036", "#6b5f50", "#8c8071", "#b3a896", "#d8cfbd", "#efe8d8"] },
+      "paper": { "role": "neutral", "displayName": "Rice Paper", "canonical": "oklch(94% 0.01 75)", "tonalRamp": ["#efe8d8", "#f4efe4", "#f7f2e9", "#fbf8f1", "#fdfbf6", "#fefdfa", "#ffffff", "#ffffff"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Front-matter Title", "purpose": "Screenplay title; loudest type, capped near 26-29px." },
+      "title": { "displayName": "Scene Slug", "purpose": "Centered shooting-script scene headings, wide tracking." },
+      "label": { "displayName": "Machine Label", "purpose": "Mono panel headers, meta, badges, confidence readouts." }
+    },
+    "shadows": [
+      { "name": "soft", "value": "0 1px 2px rgba(33,27,22,0.05), 0 8px 24px -12px rgba(33,27,22,0.18)", "purpose": "Resting elevation for panels; barely-there raise." },
+      { "name": "lift", "value": "0 2px 6px rgba(33,27,22,0.07), 0 20px 50px -20px rgba(33,27,22,0.3)", "purpose": "Hover-only lift for character cards, paired with translateY(-3px)." }
+    ],
+    "motion": [
+      { "name": "ease-out-expo", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Default easing for all state transitions, hover, and reveals." }
+    ],
+    "breakpoints": [
+      { "name": "stack", "value": "880px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The committed action (load sample, start conversion).",
+      "html": "<button class=\"ds-btn-primary\">开始转换</button>",
+      "css": ".ds-btn-primary { font-family: 'Noto Serif SC', serif; font-size: 13.5px; letter-spacing: 0.03em; padding: 9px 15px; border-radius: 8px; border: 1px solid #b23a30; background: #b23a30; color: #f7ede0; cursor: pointer; transition: background 0.16s cubic-bezier(0.16,1,0.3,1), transform 0.16s cubic-bezier(0.16,1,0.3,1); } .ds-btn-primary:hover { background: #8f2c25; transform: translateY(-1px); } .ds-btn-primary:focus-visible { outline: 2px solid #8f2c25; outline-offset: 2px; }"
+    },
+    {
+      "name": "Default Button",
+      "kind": "button",
+      "refersTo": "button-default",
+      "description": "Quiet secondary action on the panel toolbar.",
+      "html": "<button class=\"ds-btn-default\">载入示例</button>",
+      "css": ".ds-btn-default { font-family: 'Noto Serif SC', serif; font-size: 13.5px; letter-spacing: 0.03em; padding: 9px 15px; border-radius: 8px; border: 1px solid #d8cfbd; background: #fbf8f1; color: #211b16; cursor: pointer; transition: border-color 0.16s, transform 0.16s cubic-bezier(0.16,1,0.3,1); } .ds-btn-default:hover { border-color: #8c8071; transform: translateY(-1px); } .ds-btn-default:focus-visible { outline: 2px solid #b23a30; outline-offset: 2px; }"
+    },
+    {
+      "name": "Accent Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Stat / count pill; accent variant for emphasis, warn variant for open questions.",
+      "html": "<span class=\"ds-chip-accent\">7 场</span> <span class=\"ds-chip-warn\">2 待确认</span>",
+      "css": ".ds-chip-accent { font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.05em; padding: 4px 11px; border-radius: 999px; border: 1px solid #b23a30; color: #b23a30; background: rgba(178,58,48,0.10); } .ds-chip-warn { font-size: 12px; padding: 4px 11px; border-radius: 999px; border: 1px solid #a6802f; color: #a6802f; background: rgba(166,128,47,0.10); }"
+    },
+    {
+      "name": "Tab Navigation",
+      "kind": "nav",
+      "refersTo": "tab-active",
+      "description": "Output view switcher on the recessed paper strip; active tab carries the only underline accent.",
+      "html": "<div class=\"ds-tabs\"><button class=\"ds-tab ds-tab--active\">台本<span class=\"ds-tab-n\">7</span></button><button class=\"ds-tab\">人物<span class=\"ds-tab-n\">5</span></button><button class=\"ds-tab\">YAML</button></div>",
+      "css": ".ds-tabs { display: flex; gap: 2px; padding: 0 8px; background: #efe8d8; border-bottom: 1px solid #d8cfbd; } .ds-tab { appearance: none; border: 0; background: transparent; cursor: pointer; font-family: 'Noto Serif SC', serif; font-size: 14px; color: #8c8071; padding: 14px 16px; letter-spacing: 0.04em; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color 0.18s; } .ds-tab:hover { color: #211b16; } .ds-tab--active { color: #211b16; font-weight: 700; border-bottom-color: #b23a30; } .ds-tab:focus-visible { outline: 2px solid #b23a30; outline-offset: -2px; } .ds-tab-n { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #b23a30; margin-left: 6px; }"
+    },
+    {
+      "name": "Character Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Flat at rest, rises on hover; carries a role badge and confidence meter.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-name\">沈砚<span class=\"ds-role\">主角</span></div><p class=\"ds-card-desc\">书院里沉默寡言的抄经人，握有半枚旧印。</p><div class=\"ds-meter\"><i class=\"on\"></i><i class=\"on\"></i><i class=\"on\"></i><i></i></div></div>",
+      "css": ".ds-card { position: relative; border: 1px solid #d8cfbd; border-radius: 11px; padding: 18px; background: #f4efe4; transition: transform 0.2s cubic-bezier(0.16,1,0.3,1), box-shadow 0.2s cubic-bezier(0.16,1,0.3,1); } .ds-card:hover { transform: translateY(-3px); box-shadow: 0 2px 6px rgba(33,27,22,0.07), 0 20px 50px -20px rgba(33,27,22,0.3); } .ds-card-name { font-family: 'Noto Serif SC', serif; font-size: 19px; font-weight: 800; letter-spacing: 0.04em; } .ds-role { position: absolute; top: 16px; right: 16px; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em; padding: 3px 8px; border-radius: 999px; background: #b23a30; color: #f7ede0; } .ds-card-desc { font-size: 13px; line-height: 1.8; color: #4a4036; margin: 12px 0; } .ds-meter { display: flex; gap: 3px; } .ds-meter i { width: 16px; height: 5px; border-radius: 2px; background: #d8cfbd; } .ds-meter i.on { background: #5a6f5a; }"
+    },
+    {
+      "name": "Novel Textarea",
+      "kind": "input",
+      "refersTo": "button-default",
+      "description": "Borderless writing surface that sits directly on the panel paper.",
+      "html": "<div class=\"ds-input-frame\"><textarea class=\"ds-novel\" placeholder=\"粘贴小说正文，或点击载入示例…\"></textarea></div>",
+      "css": ".ds-input-frame { border: 1px solid #d8cfbd; border-radius: 12px; background: #fbf8f1; overflow: hidden; transition: border-color 0.18s; } .ds-input-frame:focus-within { border-color: #b23a30; box-shadow: inset 0 0 0 1px rgba(178,58,48,0.25); } .ds-novel { display: block; width: 100%; border: 0; outline: none; resize: vertical; background: transparent; min-height: 160px; padding: 16px 18px; font-family: 'Noto Serif SC', serif; font-size: 14px; line-height: 1.95; color: #211b16; } .ds-novel::placeholder { color: #6b5f50; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Editor's Desk",
+    "overview": "A working manuscript desk rendered in software: warm rice-paper surface, a Chinese serif set for long-form reading, and a single vermilion correction seal used the way a senior editor uses a red pen, sparingly and only where it carries meaning. Everything serves one act: reading a generated screenplay and marking it up with confidence. The system is literary, trustworthy, and effortless; it earns its cultural character through restraint, not costume. Color does real work: cinnabar means emphasis, jade means faithful/passed, gold means inferred/low-confidence.",
+    "keyCharacteristics": [
+      "Rice-paper warmth with a single vermilion accent; everything else is ink and hairline.",
+      "Semantic color: cinnabar = emphasis, jade = faithful, gold = inferred.",
+      "Serif-led long-form reading type; mono reserved for the machine voice.",
+      "Refined and restrained surfaces; depth appears only on interaction.",
+      "The generated screenplay is always the hero; chrome recedes to the margins."
+    ],
+    "rules": [
+      { "name": "The One Seal Rule", "body": "Cinnabar is the only saturated accent on any screen and stays under ~10% of the surface. Jade and gold are semantic signals, not decoration.", "section": "colors" },
+      { "name": "The One Family Rule", "body": "The serif does all reading work across weights 400-900. Do not add a second serif or sans; mono is the functional machine voice, not a display face.", "section": "typography" },
+      { "name": "The Brush-Is-A-Seal Rule", "body": "Ma Shan Zheng is confined to the 60px brand seal glyph. Never set headings, labels, or body in brush script.", "section": "typography" },
+      { "name": "The Tonal-Depth Rule", "body": "Layering is done with paper tones and hairlines first, shadow second. Shadows never stack and never go darker than the Lift token.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep cinnabar as the single accent under ~10% of any screen.",
+      "Do use jade for faithful/passed and gold for inferred/low-confidence semantically.",
+      "Do carry all reading type in one serif across weights 400-900; reserve mono for labels, meta, YAML, code.",
+      "Do build structure from hairline rules and paper tone steps before reaching for a shadow.",
+      "Do cap screenplay reading blocks at 40ch (dialogue) to 62-75ch (prose).",
+      "Do add visible :focus-visible to every button, tab, and the textarea, plus a prefers-reduced-motion alternative for spinners, pulse dots, hover lifts, and reveals.",
+      "Do darken ink-faint toward the ink end wherever it carries body or placeholder text until it clears 4.5:1."
+    ],
+    "donts": [
+      "Don't ship a generic SaaS dashboard: no blue accent, no uniform icon+heading card grid, no Inter-everywhere template.",
+      "Don't drift into skeuomorphic kitsch: no faux torn paper, dragon motifs, ancient-scroll clichés, or brush script outside the seal glyph.",
+      "Don't clutter: no dense toolbars, no second saturated accent competing with cinnabar, no noise that pulls the eye off the script.",
+      "Don't round cards or panels above 16px, and don't pair a 1px border with a wide soft drop-shadow on the same element.",
+      "Don't use a colored border-left/border-right stripe as an accent; use full borders, background tint, or a leading mark.",
+      "Don't strip focus outlines without an equal-or-better replacement.",
+      "Don't set ink-faint gray text on tinted paper for anything a reader must actually read."
+    ]
+  }
+}

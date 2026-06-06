@@ -31,9 +31,3 @@ next-env.d.ts
 
 # test
 /coverage
-
-# 项目特定忽略
-/preview
-/DESIGN.md
-/PRODUCT.md
-/.impeccable
