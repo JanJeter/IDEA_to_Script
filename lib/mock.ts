@@ -16,14 +16,16 @@ import type {
 // 产出一份结构完整、可被 Schema 校验通过的剧本。确定性、可单测。
 // ============================================================================
 
-// 对白归属抽取：要求人名出现在句首/标点/引号之后（词边界），名字取 2-3 字，
+// 对白归属抽取：要求人名出现在句首/标点/引号之后（词边界），名字取 2-6 字，
 // 之后允许 0-2 个副词字（如「低声」「苦笑」），再接核心提示动词，并以标点收尾。
 const SPEAKER_RE =
-  /(?:^|[\s。！？，、；：“”"『』「」（）\n])([一-龥]{2,3})[一-龥]{0,2}?(?:道|说|问|答|喊|叫|喝)(?=[：:，。！？“"])/gmu;
+  /(?:^|[\s。！？，、；：“”"『』「」（）\n])([一-龥]{2,6})[一-龥]{0,2}?(?:道|说|问|答|喊|叫|喝)(?=[：:，。！？“"])/gmu;
 // 名字尾部常见的副词字与提示动词字，需剔除（如「沈砚苦」→「沈砚」、「周霖问」→「周霖」）。
 const TRAILING_ADVERB = /[苦怒低声冷压缓沉笑叹忙急喝惊喜悲恍问道说答喊叫]+$/;
 // 代词/虚词/副词字：候选名若含这些字，判定为非人名（如「半晌才」「你为何」）。
 const NAME_STOP = /[你我他她它们这那何为半晌多少很都也又还才将被把于而之乎者得过着了是有没不]/;
+const CHARACTER_TITLE_RE =
+  /(?:一个|一名|那名|这名|正是|寺内)?([一-龥]{0,4}(?:女子|男子|僧人|方丈|知客僧|掌柜|黑衣人|剑客|师兄|师弟|客官|施主))/g;
 
 function cleanName(raw: string): string | null {
   const name = raw.replace(TRAILING_ADVERB, "");
@@ -40,6 +42,27 @@ function extractSpeakers(text: string): Map<string, number> {
     if (name) counts.set(name, (counts.get(name) ?? 0) + 1);
   }
   return counts;
+}
+
+function extractCharacterMentions(text: string): Map<string, number> {
+  const counts = new Map<string, number>();
+  let m: RegExpExecArray | null;
+  CHARACTER_TITLE_RE.lastIndex = 0;
+  while ((m = CHARACTER_TITLE_RE.exec(text)) !== null) {
+    const name = cleanName(m[1]);
+    if (name) counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  return counts;
+}
+
+function mergeCounts(...maps: Map<string, number>[]): Map<string, number> {
+  const merged = new Map<string, number>();
+  for (const map of maps) {
+    for (const [key, count] of map) {
+      merged.set(key, (merged.get(key) ?? 0) + count);
+    }
+  }
+  return merged;
 }
 const QUOTE_RE = /[“"「『]([^”"」』]+)[”"」』]/g;
 const LOCATION_SUFFIX =
@@ -82,6 +105,45 @@ function inferMood(text: string): string {
   if (/(笑|喜|乐|温|暖|柔)/.test(text)) return "温情";
   if (/(悲|泪|哭|叹|孤|冷)/.test(text)) return "压抑";
   return "平稳";
+}
+
+function inferConflict(text: string): string {
+  if (/(交出|可留全尸|执刀|刀光|银针|住手)/.test(text)) return "夺匣者夜闯禅房，双方爆发正面冲突。";
+  if (/(军粮案|灭口|虎符|位极人臣|继续追查)/.test(text)) return "旧案线索浮现，追查将从江湖恩怨升级为朝堂危局。";
+  if (/(遗物|铜牌|十九年|木匣)/.test(text)) return "白衣女子带回遗物，迫使寒山寺旧事重启。";
+  return "";
+}
+
+function inferCharacterRole(name: string, index: number): Character["role"] {
+  if (/(女子|男子|剑客)/.test(name) && index === 0) return "protagonist";
+  if (/(僧人|黑衣人|师弟)/.test(name)) return "antagonist";
+  if (/(方丈|掌柜|知客僧|师兄)/.test(name)) return "supporting";
+  return index === 0 ? "protagonist" : "supporting";
+}
+
+function describeCharacter(name: string, count: number): string {
+  if (name.includes("女子")) return `从原文称谓坐实的人物，围绕遗物与旧案行动，出现约 ${count} 次。`;
+  if (name.includes("方丈")) return `寒山寺长者，掌握旧案线索，出现约 ${count} 次。`;
+  if (name.includes("僧人") || name.includes("黑衣人")) return `持刀夺匣的关键对立人物，出现约 ${count} 次。`;
+  if (name.includes("知客僧")) return `寒山寺接引人物，负责引出方丈与铜牌线索，出现约 ${count} 次。`;
+  if (name.includes("师兄")) return `旧案相关的缺席人物，其遗物推动剧情，出现约 ${count} 次。`;
+  return `自动抽取并坐实的原文人物/称谓，出现约 ${count} 次。`;
+}
+
+function inferCharacterArc(name: string): string {
+  if (name.includes("女子")) return "从送回遗物的来客转为继续追查旧案的行动者。";
+  if (name.includes("方丈")) return "从守秘者转为揭示旧案关键线索的引路人。";
+  if (name.includes("僧人") || name.includes("黑衣人")) return "从潜伏者暴露为旧案未死相关人，推动冲突升级。";
+  if (name.includes("师兄")) return "作为缺席的死者与旧案核心，持续牵引主线。";
+  return "";
+}
+
+function describeLocation(name: string): string {
+  if (name.includes("寒山寺")) return "秋雨中的古寺，旧案遗物与夜袭事件的核心发生地。";
+  if (name.includes("禅房")) return "寒山寺后院禅房，木匣交付与夜袭交手之处。";
+  if (name.includes("塔林")) return "寒山寺后山塔林，手札与虎符真相浮现之处。";
+  if (name.includes("山门")) return "寒山寺入口，白衣女子抵达并递出铜牌之处。";
+  return "自动抽取的地点。";
 }
 
 function splitParagraphs(content: string): string[] {
@@ -138,6 +200,7 @@ function paragraphToElements(
   paragraph: string,
   charNameToId: Map<string, string>,
   isFirstParagraph: boolean,
+  fallbackSpeaker?: string,
 ): SceneElement[] {
   const elements: SceneElement[] = [];
   const quotes: { line: string; index: number }[] = [];
@@ -167,7 +230,11 @@ function paragraphToElements(
   for (const q of quotes) {
     const before = paragraph.slice(0, q.index);
     const sm = [...before.matchAll(SPEAKER_RE)];
-    const speaker = sm.length > 0 ? cleanName(sm[sm.length - 1][1]) ?? undefined : undefined;
+    const explicit = sm.length > 0 ? cleanName(sm[sm.length - 1][1]) ?? undefined : undefined;
+    const pronounSpeaker = /(?:^|[，。！？\s])(他|她)[一-龥]{0,4}?(?:道|说|问|答|喊|叫|喝)[：:，。！？“"]/.test(before)
+      ? fallbackSpeaker
+      : undefined;
+    const speaker = explicit ?? pronounSpeaker;
     const element: SceneElement = { type: "dialogue", text: q.line };
     if (speaker) {
       element.character_name = speaker;
@@ -178,6 +245,13 @@ function paragraphToElements(
     elements.push(element);
   }
   return elements;
+}
+
+function findMentionedCharacter(text: string, charNameToId: Map<string, string>): string | undefined {
+  for (const name of charNameToId.keys()) {
+    if (text.includes(name)) return name;
+  }
+  return undefined;
 }
 
 const MAX_PARAGRAPHS_PER_SCENE = 12;
@@ -196,16 +270,20 @@ export function generateMockScreenplay(
   const fullText = chapters.map((c) => c.content).join("\n");
 
   // —— 人物表 ——
-  const speakerCounts = extractSpeakers(fullText);
-  const topNames = topN(speakerCounts, 8);
+  const characterCounts = mergeCounts(extractCharacterMentions(fullText), extractSpeakers(fullText));
+  const topNames = topN(characterCounts, 10);
   const characters: Character[] = topNames.map((name, i) => ({
     id: `char_${i + 1}`,
     name,
     aliases: [],
-    role: i === 0 ? "protagonist" : i === 1 ? "antagonist" : "supporting",
-    description: `自动抽取的人物（出场约 ${speakerCounts.get(name)} 次台词）。`,
-    traits: [],
-    arc: "",
+    role: inferCharacterRole(name, i),
+    description: describeCharacter(name, characterCounts.get(name) ?? 1),
+    traits: /(女子|男子|剑客)/.test(name)
+      ? ["关键行动者"]
+      : /(僧人|黑衣人|师弟)/.test(name)
+        ? ["威胁", "隐秘"]
+        : [],
+    arc: inferCharacterArc(name),
   }));
   const charNameToId = new Map(characters.map((c) => [c.name, c.id]));
 
@@ -219,8 +297,8 @@ export function generateMockScreenplay(
     id: `loc_${i + 1}`,
     name,
     type: /(房|屋|厅|堂|殿|宫|楼|阁|院|客栈|酒馆)/.test(name) ? "interior" : "exterior",
-    description: "自动抽取的地点。",
-    source_chapters: [],
+    description: describeLocation(name),
+    source_chapters: chapters.filter((c) => c.content.includes(name)).map((c) => c.index),
   }));
   const locNameToId = new Map(locations.map((l) => [l.name, l.id]));
 
@@ -245,8 +323,10 @@ export function generateMockScreenplay(
     }
 
     const elements: SceneElement[] = [];
+    let lastMentionedCharacter: string | undefined;
     used.forEach((p, idx) => {
-      elements.push(...paragraphToElements(p, charNameToId, idx === 0));
+      lastMentionedCharacter = findMentionedCharacter(p, charNameToId) ?? lastMentionedCharacter;
+      elements.push(...paragraphToElements(p, charNameToId, idx === 0, lastMentionedCharacter));
     });
     if (elements.length === 0) {
       elements.push({ type: "narration", text: chapter.summary ?? chapter.title });
@@ -254,9 +334,14 @@ export function generateMockScreenplay(
 
     const presentChars = [
       ...new Set(
-        elements
+        [
+          ...elements
           .filter((e) => e.character_id)
           .map((e) => e.character_id as string),
+          ...characters
+            .filter((c) => chapter.content.includes(c.name))
+            .map((c) => c.id),
+        ],
       ),
     ];
 
@@ -282,7 +367,7 @@ export function generateMockScreenplay(
       characters: presentChars,
       mood: inferMood(chapter.content),
       pace: "medium",
-      conflict: "",
+      conflict: inferConflict(chapter.content),
       adaptation: buildAdaptation(paragraphs.length, used.length),
       elements,
     };

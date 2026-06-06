@@ -74,7 +74,28 @@
           },
           "description": { "type": "string" },
           "traits": { "type": "array", "items": { "type": "string" } },
-          "arc": { "type": "string", "description": "人物弧光/成长线" }
+          "arc": { "type": "string", "description": "人物弧光/成长线" },
+          "evidence": {
+            "type": "array",
+            "description": "人物坐实证据：该人物/称谓首次或关键出现的原文章节段落",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": ["chapter_index", "paragraph_start", "paragraph_end", "excerpt"],
+              "properties": {
+                "chapter_index": { "type": "integer", "minimum": 1 },
+                "chapter_title": { "type": "string" },
+                "paragraph_start": { "type": "integer", "minimum": 1 },
+                "paragraph_end": { "type": "integer", "minimum": 1 },
+                "excerpt": { "type": "string", "minLength": 1 }
+              }
+            }
+          },
+          "confidence": {
+            "type": "string",
+            "enum": ["high", "medium", "low"],
+            "description": "AI 对人物归一/别名合并的置信度"
+          }
         }
       }
     },

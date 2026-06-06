@@ -4,6 +4,7 @@ import {
   isMockMode,
   analyzeChapter,
   aggregateCharacters,
+  resolveCharacters,
   extractWorldview,
   generateScenesForChapter,
   repairAgainstSchema,
@@ -51,13 +52,35 @@ function coerce<T extends string>(value: unknown, allowed: readonly T[], fallbac
 }
 
 // 把 AI 返回的人物数组规整为带稳定 id 的 Character[]，并建立 名称/别名 -> id 映射。
-function mapCharacters(raw: any[]): { characters: Character[]; nameToId: Map<string, string> } {
+function mapCharacterEvidence(raw: any): SourceReference[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const evidence = raw
+    .map((ref: any): SourceReference | null => {
+      const excerpt = ref?.excerpt ? String(ref.excerpt).trim() : "";
+      if (!excerpt) return null;
+      const start = Number(ref?.paragraph_start);
+      const end = Number(ref?.paragraph_end);
+      const chapterIndex = Number(ref?.chapter_index);
+      return {
+        chapter_index: Number.isInteger(chapterIndex) && chapterIndex > 0 ? chapterIndex : 1,
+        chapter_title: ref?.chapter_title ? String(ref.chapter_title) : undefined,
+        paragraph_start: Number.isInteger(start) && start > 0 ? start : 1,
+        paragraph_end: Number.isInteger(end) && end > 0 ? end : Math.max(1, Number.isInteger(start) ? start : 1),
+        excerpt,
+      };
+    })
+    .filter(Boolean) as SourceReference[];
+  return evidence.length ? evidence : undefined;
+}
+
+export function mapResolvedCharacters(raw: any[]): { characters: Character[]; nameToId: Map<string, string> } {
   const nameToId = new Map<string, string>();
   const characters: Character[] = (raw ?? []).map((c, i) => {
     const id = `char_${i + 1}`;
     const name = String(c?.name ?? `人物${i + 1}`);
     nameToId.set(name, id);
     (c?.aliases ?? []).forEach((a: string) => nameToId.set(String(a), id));
+    if (c?.canonical_name) nameToId.set(String(c.canonical_name), id);
     return {
       id,
       name,
@@ -66,6 +89,8 @@ function mapCharacters(raw: any[]): { characters: Character[]; nameToId: Map<str
       description: c?.description ? String(c.description) : "",
       traits: Array.isArray(c?.traits) ? c.traits.map(String) : [],
       arc: c?.arc ? String(c.arc) : "",
+      evidence: mapCharacterEvidence(c?.evidence),
+      confidence: coerce(c?.confidence, ["high", "medium", "low"] as const, "medium"),
     };
   });
   return { characters, nameToId };
@@ -128,7 +153,12 @@ function mapScene(
     source_chapter: chapterIndex,
     source_refs: sourceRefs,
     summary: raw?.summary ? String(raw.summary) : "",
-    characters: [...new Set(elements.filter((e) => e.character_id).map((e) => e.character_id as string))],
+    characters: [
+      ...new Set([
+        ...(Array.isArray(raw?.characters) ? raw.characters.map(String) : []),
+        ...elements.filter((e) => e.character_id).map((e) => e.character_id as string),
+      ]),
+    ],
     mood: raw?.mood ? String(raw.mood) : "平稳",
     pace: coerce(raw?.pace, ["slow", "medium", "fast", "unspecified"] as const, "medium"),
     conflict: raw?.conflict ? String(raw.conflict) : "",
@@ -209,9 +239,8 @@ export async function* runPipeline(
   rawText: string,
   options: ConvertOptions = {},
 ): AsyncGenerator<ConvertEvent> {
-  // 强制使用 AI 模式（忽略环境变量配置）
-  const mock = false;
-  const mode: "ai" | "mock" = "ai";
+  const mock = isMockMode();
+  const mode: "ai" | "mock" = mock ? "mock" : "ai";
 
   // —— 第 1 步：章节解析（确定性）——
   yield { type: "step", key: "parse", label: "章节解析", status: "running" };
@@ -235,18 +264,17 @@ export async function* runPipeline(
   // 始终先算一份 mock 基线，保证任何 AI 步骤失败都能完整兜底。
   const baseline = generateMockScreenplay(chapters, options);
 
-  // 已强制使用 AI 模式，跳过 mock 分支
-  // if (mock) {
-  //   yield { type: "step", key: "analyze", label: "章节级分析", status: "running" };
-  //   yield { type: "step", key: "analyze", label: "章节级分析", status: "done", detail: "mock 模式：基于规则抽取" };
-  //   yield { type: "step", key: "aggregate", label: "人物/世界观汇总", status: "running" };
-  //   yield { type: "step", key: "aggregate", label: "人物/世界观汇总", status: "done", detail: `${baseline.characters.length} 人物 / ${baseline.locations.length} 地点` };
-  //   yield { type: "step", key: "scenes", label: "分场剧本生成", status: "running" };
-  //   yield { type: "step", key: "scenes", label: "分场剧本生成", status: "done", detail: `${baseline.scenes.length} 场` };
-  //
-  //   yield* finalize(baseline, "mock", chapters);
-  //   return;
-  // }
+  if (mock) {
+    yield { type: "step", key: "analyze", label: "章节级分析", status: "running" };
+    yield { type: "step", key: "analyze", label: "章节级分析", status: "done", detail: "mock 模式：基于规则抽取" };
+    yield { type: "step", key: "aggregate", label: "人物/世界观汇总", status: "running" };
+    yield { type: "step", key: "aggregate", label: "人物/世界观汇总", status: "done", detail: `${baseline.characters.length} 人物 / ${baseline.locations.length} 地点` };
+    yield { type: "step", key: "scenes", label: "分场剧本生成", status: "running" };
+    yield { type: "step", key: "scenes", label: "分场剧本生成", status: "done", detail: `${baseline.scenes.length} 场` };
+
+    yield* finalize(baseline, "mock", chapters);
+    return;
+  }
 
   // —— AI 模式 ——
   let screenplay = baseline;
@@ -259,9 +287,14 @@ export async function* runPipeline(
 
     // 第 3 步：人物 + 世界观汇总
     yield { type: "step", key: "aggregate", label: "人物/世界观汇总", status: "running" };
-    const allChars = analyses.flatMap((a) => a.characters ?? []);
-    const charAgg = await aggregateCharacters(allChars);
-    const { characters, nameToId } = mapCharacters(charAgg.characters ?? []);
+    let charAgg: { characters: any[] };
+    try {
+      charAgg = await resolveCharacters({ chapters, chapterAnalyses: analyses });
+    } catch {
+      const allChars = analyses.flatMap((a) => a.characters ?? []);
+      charAgg = await aggregateCharacters(allChars);
+    }
+    const { characters, nameToId } = mapResolvedCharacters(charAgg.characters ?? []);
 
     const worldview = await extractWorldview(chapters.map((c) => c.summary ?? ""));
     const { locations } = mapLocations(worldview.locations ?? []);
@@ -287,7 +320,14 @@ export async function* runPipeline(
 
     // 第 4 步：分场生成（逐章；单章失败回退该章 mock 场景）
     yield { type: "step", key: "scenes", label: "分场剧本生成", status: "running" };
-    const knownChars = screenplay.characters.map((c) => ({ id: c.id, name: c.name, aliases: c.aliases }));
+    const knownChars = screenplay.characters.map((c) => ({
+      id: c.id,
+      name: c.name,
+      aliases: c.aliases,
+      evidence: c.evidence,
+      confidence: c.confidence,
+      description: c.description,
+    }));
     const knownLocs = screenplay.locations.map((l) => ({ id: l.id, name: l.name }));
     const scenes: Scene[] = [];
     const adaptationNotes: any[] = [];

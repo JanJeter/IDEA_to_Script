@@ -77,6 +77,51 @@ export function characterExtractionPrompt(perChapterCharacters: string): PromptP
   };
 }
 
+// 2b) AI 人物坐实 / 别名归一 / 证据链
+export function characterResolutionPrompt(args: {
+  chapters: { index: number; title: string; content: string; summary?: string }[];
+  chapterAnalyses: unknown;
+}): PromptPair {
+  const numberedChapters = args.chapters
+    .map((chapter) => `第 ${chapter.index} 章：${chapter.title}
+${numberParagraphs(chapter.content)}`)
+    .join("\n\n");
+
+  return {
+    system: `${BASE_RULES}
+
+任务：做「人物坐实」与「称谓/别名/代词归一」。这是后续剧本生成引用人物 ID 的唯一依据。
+你必须阅读原文段落，而不是只依赖章节摘要。
+
+要求：
+1. 同一人物的不同称呼必须合并到一个人物：如“她 / 女子 / 白衣女子 / 施主”应合并；“老方丈 / 方丈 / 师父”若语境一致也应合并。
+2. 不要凭空给无名人物起真实姓名。原文没有姓名时，用最稳定、最具体的原文称谓作为 name，如“白衣女子”“灰衣僧人”。
+3. aliases 写该人物在原文中的其他称呼、代词或身份称谓。
+4. evidence 必须给出 1-3 条原文证据，标注 chapter_index、chapter_title、paragraph_start、paragraph_end、excerpt。
+5. confidence 表示归一置信度：high / medium / low。拿不准的合并要拆开，或用 low 并在 description 说明。
+6. 输出 characters 顺序按叙事重要性排序，主角在前。
+
+严格输出 JSON：
+{
+  "characters": [{
+    "name":"原文中最稳定的称谓或姓名",
+    "aliases":["其他称呼/代词/身份"],
+    "role":"protagonist|antagonist|supporting|minor|narrator|unknown",
+    "description":"人物身份、目标、与主线关系",
+    "traits":["性格/行动标签"],
+    "arc":"人物弧光，不明确填空字符串",
+    "confidence":"high|medium|low",
+    "evidence":[{"chapter_index":1,"chapter_title":"第一章 标题","paragraph_start":2,"paragraph_end":2,"excerpt":"原文短摘录"}]
+  }]
+}`,
+    user: `章节级分析结果（供参考，不可替代原文判断）：
+${JSON.stringify(args.chapterAnalyses)}
+
+原文（已按自然段编号）：
+${numberedChapters}`,
+  };
+}
+
 // 3) 世界观 / 背景设定提取
 export function worldviewPrompt(chapterSummaries: string): PromptPair {
   return {
@@ -110,6 +155,9 @@ export function sceneGenerationPrompt(args: {
 - 尽量复用给定的 character_id 与 location_id；若出现新地点，location_id 留空并在 heading 中写出地点名。
 - elements 必须按时间顺序排列，type 仅限 dialogue/action/narration/transition。
 - dialogue 必须带 character_name；动作描写用 action；环境/心理旁白用 narration；转场用 transition。
+- dialogue 的 character_id 必须引用“已知人物表”中的 id；character_name 使用该人物的 name，不要临时创造新名字。
+- 若原文用代词或临时称谓说话，必须根据已知人物表 aliases 归一到正确 character_id。
+- 本场 characters 必须列出所有出场人物 id，包括有动作但没有台词的人物。
 - 为每场标注 mood（情绪）与 pace（slow|medium|fast）。
 - 每场必须标注 source_refs：来自本章哪几段原文，paragraph_start/paragraph_end 使用从 1 开始的段落序号，excerpt 保留对应原文短摘录。
 - 每场必须标注 adaptation：说明本场整体改编策略，以及 AI 对原文做了哪些压缩、合并、删减、重写、推断或重排。
