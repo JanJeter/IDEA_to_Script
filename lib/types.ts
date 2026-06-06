@@ -71,6 +71,8 @@ export interface Character {
   description?: string;
   traits?: string[];
   arc?: string;
+  evidence?: SourceReference[];
+  confidence?: "high" | "medium" | "low";
 }
 
 export interface Location {
