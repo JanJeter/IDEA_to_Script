@@ -24,6 +24,18 @@ describe("generateMockScreenplay", () => {
     }
   });
 
+  it("每场戏都标注原文章节段落与 AI 删改说明", () => {
+    for (const scene of screenplay.scenes) {
+      expect(scene.source_refs?.length).toBeGreaterThan(0);
+      expect(scene.source_refs?.[0].chapter_index).toBe(scene.source_chapter);
+      expect(scene.source_refs?.[0].paragraph_start).toBeGreaterThanOrEqual(1);
+      expect(scene.source_refs?.[0].paragraph_end).toBeGreaterThanOrEqual(scene.source_refs?.[0].paragraph_start ?? 1);
+      expect(scene.source_refs?.[0].excerpt).toBeTruthy();
+      expect(scene.adaptation?.ai_edits.length).toBeGreaterThan(0);
+      expect(scene.adaptation?.ai_edits[0].note).toBeTruthy();
+    }
+  });
+
   it("从对白中抽取到人物", () => {
     const names = screenplay.characters.map((c) => c.name);
     expect(names).toContain("沈砚");

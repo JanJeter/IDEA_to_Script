@@ -3,8 +3,10 @@ import type {
   Character,
   Location,
   Scene,
+  SceneAdaptation,
   SceneElement,
   Screenplay,
+  SourceReference,
   TimeOfDay,
   TimelineNode,
 } from "./types";
@@ -87,6 +89,48 @@ function splitParagraphs(content: string): string[] {
     .split(/\n+/)
     .map((p) => p.trim())
     .filter((p) => p.length > 0);
+}
+
+function makeExcerpt(paragraphs: string[], maxLen = 180): string {
+  const clean = paragraphs.join(" ").replace(/\s+/g, " ").trim();
+  if (clean.length <= maxLen) return clean;
+  return clean.slice(0, maxLen) + "…";
+}
+
+function buildSourceRef(chapter: Chapter, usedParagraphs: string[]): SourceReference {
+  return {
+    chapter_index: chapter.index,
+    chapter_title: chapter.title,
+    paragraph_start: 1,
+    paragraph_end: Math.max(1, usedParagraphs.length),
+    excerpt: makeExcerpt(usedParagraphs.length > 0 ? usedParagraphs : [chapter.summary ?? chapter.title]),
+  };
+}
+
+function buildAdaptation(paragraphCount: number, usedCount: number): SceneAdaptation {
+  const ai_edits: SceneAdaptation["ai_edits"] = [
+    {
+      type: paragraphCount > usedCount ? "compression" : "rewrite",
+      source_ref: `P1-P${Math.max(1, usedCount)}`,
+      note:
+        paragraphCount > usedCount
+          ? `保留前 ${usedCount} 段作为本场核心内容，其余段落暂未展开。`
+          : "将原文叙述整理为剧本元素，未新增关键剧情。",
+    },
+  ];
+
+  if (paragraphCount > usedCount) {
+    ai_edits.push({
+      type: "cut",
+      source_ref: `P${usedCount + 1}-P${paragraphCount}`,
+      note: "超出 MVP 单场长度的段落暂作删减，建议人工复核是否需要拆为新场。",
+    });
+  }
+
+  return {
+    strategy: paragraphCount > usedCount ? "compressed" : "faithful",
+    ai_edits,
+  };
 }
 
 /** 将一个段落转换为若干剧本元素。 */
@@ -233,11 +277,13 @@ export function generateMockScreenplay(
       location_id: sceneLocId,
       time,
       source_chapter: chapter.index,
+      source_refs: [buildSourceRef(chapter, used)],
       summary: chapter.summary ?? `第 ${chapter.index} 章改编场景`,
       characters: presentChars,
       mood: inferMood(chapter.content),
       pace: "medium",
       conflict: "",
+      adaptation: buildAdaptation(paragraphs.length, used.length),
       elements,
     };
     scenes.push(scene);

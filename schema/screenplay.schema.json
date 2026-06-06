@@ -166,6 +166,23 @@
             "enum": ["dawn", "morning", "noon", "afternoon", "evening", "night", "unspecified"]
           },
           "source_chapter": { "type": "integer", "minimum": 1, "description": "来源章节索引，保证可回溯" },
+          "source_refs": {
+            "type": "array",
+            "description": "本场戏对应的原文章节与段落范围，保留短摘录用于审稿回溯",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": ["chapter_index", "paragraph_start", "paragraph_end", "excerpt"],
+              "properties": {
+                "chapter_index": { "type": "integer", "minimum": 1 },
+                "chapter_title": { "type": "string" },
+                "paragraph_start": { "type": "integer", "minimum": 1 },
+                "paragraph_end": { "type": "integer", "minimum": 1 },
+                "excerpt": { "type": "string", "minLength": 1, "description": "原文短摘录，不存整章，便于定位与人工复核" }
+              }
+            }
+          },
           "summary": { "type": "string", "description": "本场剧情摘要" },
           "characters": { "type": "array", "items": { "type": "string" }, "description": "出场人物 id 列表" },
           "mood": { "type": "string", "description": "情绪基调，如 紧张 / 温情 / 压抑" },
@@ -175,6 +192,35 @@
             "description": "节奏标记"
           },
           "conflict": { "type": "string", "description": "本场核心冲突或转折" },
+          "adaptation": {
+            "type": "object",
+            "description": "本场改编记录：标注 AI 对原文做了哪些压缩、合并、删改、重排或推断",
+            "additionalProperties": true,
+            "required": ["strategy", "ai_edits"],
+            "properties": {
+              "strategy": {
+                "type": "string",
+                "enum": ["faithful", "compressed", "merged", "rewritten", "inferred"],
+                "description": "整体改编策略"
+              },
+              "ai_edits": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "required": ["type", "note"],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": ["compression", "merge", "cut", "rewrite", "inference", "reorder", "other"]
+                    },
+                    "note": { "type": "string", "minLength": 1 },
+                    "source_ref": { "type": "string", "description": "可选，说明该改编对应的段落范围，如 P1-P3" }
+                  }
+                }
+              }
+            }
+          },
           "elements": {
             "type": "array",
             "description": "按时间顺序排列的剧本元素：对白/动作/旁白/转场",
