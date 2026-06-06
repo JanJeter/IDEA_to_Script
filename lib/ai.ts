@@ -6,6 +6,7 @@ import {
   worldviewPrompt,
   sceneGenerationPrompt,
   schemaRepairPrompt,
+  contentSafetyReviewPrompt,
   type PromptPair,
 } from "./prompts";
 import type { Chapter } from "./types";
@@ -49,6 +50,55 @@ async function callJson<T = any>(prompt: PromptPair): Promise<T> {
   });
   const content = res.choices[0]?.message?.content ?? "";
   return JSON.parse(stripFences(content)) as T;
+}
+
+async function callText(prompt: PromptPair, temperature = 0): Promise<string> {
+  const client = getClient();
+  const res = await client.chat.completions.create({
+    model: getModel(),
+    temperature,
+    messages: [
+      { role: "system", content: prompt.system },
+      { role: "user", content: prompt.user },
+    ],
+  });
+  return stripFences(res.choices[0]?.message?.content ?? "");
+}
+
+export type SafetyTarget = "source" | "screenplay";
+export type SafetyReviewOutput = "PASS" | `BLOCK: ${string}`;
+
+export function normalizeSafetyReviewOutput(text: string): SafetyReviewOutput {
+  const firstLine = stripFences(text).split(/\r?\n/).find((line) => line.trim())?.trim() ?? "";
+  if (/^PASS\b/i.test(firstLine)) return "PASS";
+
+  const block = firstLine.match(/^BLOCK\s*[:：]\s*(.+)$/i);
+  if (block?.[1]?.trim()) return `BLOCK: ${block[1].trim()}`;
+
+  return "BLOCK: 内容安全审查返回格式异常";
+}
+
+function mockReviewContentSafety(content: string): SafetyReviewOutput {
+  const normalized = content.replace(/\s+/g, "");
+  const rules: { pattern: RegExp; reason: string }[] = [
+    { pattern: /色情|涉黄|裸聊|卖淫|嫖娼|性交易|强奸|猥亵|乱伦|性侵/, reason: "包含涉黄或性违法风险内容" },
+    { pattern: /虐杀|酷刑|分尸|血腥|自杀教程|杀人方法|爆炸物制作|制毒|贩毒/, reason: "包含暴力或违法违规风险内容" },
+    { pattern: /颠覆国家|恐怖主义|极端主义|分裂国家|煽动暴乱/, reason: "包含政治敏感或极端违法风险内容" },
+  ];
+  const hit = rules.find((rule) => rule.pattern.test(normalized));
+  return hit ? `BLOCK: ${hit.reason}` : "PASS";
+}
+
+export async function reviewContentSafety(args: {
+  target: SafetyTarget;
+  content: string;
+}): Promise<SafetyReviewOutput> {
+  if (isMockMode()) {
+    return mockReviewContentSafety(args.content);
+  }
+
+  const output = await callText(contentSafetyReviewPrompt(args), 0);
+  return normalizeSafetyReviewOutput(output);
 }
 
 export interface ChapterAnalysis {
