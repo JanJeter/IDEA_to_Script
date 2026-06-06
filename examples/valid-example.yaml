@@ -1,0 +1,33 @@
+# 最小化的「Schema 校验通过」示例。
+# 校验：node scripts/validate.mjs examples/valid-example.yaml
+metadata:
+  title: 山海客栈（剧本初稿）
+  format: drama
+  language: zh-CN
+source:
+  novel_title: 山海客栈
+  chapter_count: 3
+characters:
+  - id: char_1
+    name: 沈砚
+    role: protagonist
+locations:
+  - id: loc_1
+    name: 山海客栈
+    type: interior
+timeline:
+  - id: tl_1
+    order: 0
+    label: 第一夜
+    time_of_day: night
+scenes:
+  - id: scene_c1_s1
+    heading: 内景 山海客栈大堂 - 夜
+    source_chapter: 1
+    elements:
+      - type: narration
+        text: 风雪封门，灯火摇曳。
+      - type: dialogue
+        character_id: char_1
+        character_name: 沈砚
+        text: 住店。
