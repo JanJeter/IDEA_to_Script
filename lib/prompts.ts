@@ -199,6 +199,30 @@ ${numberParagraphs(args.chapterContent)}`,
   };
 }
 
+// 5) 内容安全审查：复用与生成相同的大模型，只允许输出 PASS / BLOCK。
+export function contentSafetyReviewPrompt(args: {
+  target: "source" | "screenplay";
+  content: string;
+}): PromptPair {
+  const targetLabel = args.target === "source" ? "小说原文前 2000 字" : "生成的剧本内容";
+  return {
+    system: `你是内容安全审核员。请审查用户提供的${targetLabel}是否包含涉黄、暴力、政治敏感或违法违规内容。
+
+审核规则：
+1. 只判断文本是否应被拦截，不改写、不续写、不补充内容。
+2. 如包含露骨性描写、未成年人相关性内容、色情交易或性剥削，拦截。
+3. 如包含血腥暴力、酷刑、虐杀、详细伤害方法、鼓励或美化暴力，拦截。
+4. 如包含政治敏感内容、煽动颠覆、极端主义、仇恨或违法违规行为指导，拦截。
+5. 普通悬疑、武侠、冲突、非露骨爱情、非详细犯罪情节可通过。
+
+输出格式必须且只能是以下之一：
+PASS
+BLOCK: [一句话说明原因]`,
+    user: `${targetLabel}：
+${args.content}`,
+  };
+}
+
 // 5) YAML 格式修复（模型直出 YAML 失败时的兜底）
 export function yamlRepairPrompt(brokenYaml: string, parseError: string): PromptPair {
   return {

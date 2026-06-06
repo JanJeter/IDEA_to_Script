@@ -2,15 +2,17 @@
 
 import { useState } from "react";
 
-type StepKey = "parse" | "analyze" | "aggregate" | "scenes" | "validate";
+type StepKey = "source_review" | "parse" | "analyze" | "aggregate" | "scenes" | "validate" | "screenplay_review";
 type StepStatus = "idle" | "running" | "done" | "failed";
 
 const steps: { key: StepKey; label: string }[] = [
+  { key: "source_review", label: "原文安全审核" },
   { key: "parse", label: "章节解析" },
   { key: "analyze", label: "章节分析" },
   { key: "aggregate", label: "人物 / 世界观汇总" },
   { key: "scenes", label: "分场剧本生成" },
   { key: "validate", label: "Schema 校验" },
+  { key: "screenplay_review", label: "剧本安全审核" },
 ];
 
 const initialStepState = Object.fromEntries(
@@ -109,8 +111,9 @@ export default function Page() {
         }
       }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "转换失败");
-      setStatus("转换失败");
+      const errorMessage = error instanceof Error ? error.message : "转换失败";
+      setMessage(errorMessage);
+      setStatus(errorMessage.startsWith("BLOCK:") ? "审核拦截" : "转换失败");
     } finally {
       setConverting(false);
     }
