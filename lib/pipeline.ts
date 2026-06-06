@@ -15,8 +15,10 @@ import type {
   Character,
   Location,
   Scene,
+  SceneAdaptation,
   SceneElement,
   Screenplay,
+  SourceReference,
   TimeOfDay,
 } from "./types";
 
@@ -39,6 +41,8 @@ export type ConvertEvent =
   | { type: "error"; message: string };
 
 const TIME_ENUM: TimeOfDay[] = ["dawn", "morning", "noon", "afternoon", "evening", "night", "unspecified"];
+const ADAPTATION_STRATEGY = ["faithful", "compressed", "merged", "rewritten", "inferred"] as const;
+const ADAPTATION_CHANGE_TYPE = ["compression", "merge", "cut", "rewrite", "inference", "reorder", "other"] as const;
 
 function coerce<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
   return typeof value === "string" && (allowed as readonly string[]).includes(value)
@@ -86,7 +90,7 @@ function mapLocations(raw: any[]): { locations: Location[]; nameToId: Map<string
 
 function mapScene(
   raw: any,
-  chapterIndex: number,
+  chapter: Chapter,
   sceneNo: number,
   charNameToId: Map<string, string>,
 ): Scene {
@@ -111,6 +115,10 @@ function mapScene(
     elements.push({ type: "narration", text: String(raw?.summary ?? "（本场待补充）") });
   }
 
+  const sourceRefs = mapSourceRefs(raw?.source_refs, chapter);
+  const adaptation = mapAdaptation(raw?.adaptation, sourceRefs);
+  const chapterIndex = chapter.index;
+
   return {
     id: `scene_c${chapterIndex}_s${sceneNo}`,
     heading: String(raw?.heading ?? `第${chapterIndex}章 第${sceneNo}场`),
@@ -118,12 +126,78 @@ function mapScene(
     location_id: raw?.location_id ? String(raw.location_id) : undefined,
     time: coerce(raw?.time, TIME_ENUM, "unspecified"),
     source_chapter: chapterIndex,
+    source_refs: sourceRefs,
     summary: raw?.summary ? String(raw.summary) : "",
     characters: [...new Set(elements.filter((e) => e.character_id).map((e) => e.character_id as string))],
     mood: raw?.mood ? String(raw.mood) : "平稳",
     pace: coerce(raw?.pace, ["slow", "medium", "fast", "unspecified"] as const, "medium"),
     conflict: raw?.conflict ? String(raw.conflict) : "",
+    adaptation,
     elements,
+  };
+}
+
+function chapterExcerpt(chapter: Chapter, maxLen = 180): string {
+  const clean = chapter.content.replace(/\s+/g, " ").trim() || chapter.summary || chapter.title;
+  return clean.length <= maxLen ? clean : clean.slice(0, maxLen) + "…";
+}
+
+function mapSourceRefs(raw: any, chapter: Chapter): SourceReference[] {
+  const refs = Array.isArray(raw) ? raw : [];
+  const mapped = refs
+    .map((ref: any): SourceReference | null => {
+      const excerpt = ref?.excerpt ? String(ref.excerpt).trim() : "";
+      if (!excerpt) return null;
+      const start = Number(ref?.paragraph_start);
+      const end = Number(ref?.paragraph_end);
+      return {
+        chapter_index: Number.isInteger(Number(ref?.chapter_index)) ? Number(ref.chapter_index) : chapter.index,
+        chapter_title: ref?.chapter_title ? String(ref.chapter_title) : chapter.title,
+        paragraph_start: Number.isInteger(start) && start > 0 ? start : 1,
+        paragraph_end: Number.isInteger(end) && end > 0 ? end : Math.max(1, Number.isInteger(start) ? start : 1),
+        excerpt,
+      };
+    })
+    .filter(Boolean) as SourceReference[];
+
+  return mapped.length
+    ? mapped
+    : [
+        {
+          chapter_index: chapter.index,
+          chapter_title: chapter.title,
+          paragraph_start: 1,
+          paragraph_end: 1,
+          excerpt: chapterExcerpt(chapter),
+        },
+      ];
+}
+
+function mapAdaptation(raw: any, refs: SourceReference[]): SceneAdaptation {
+  const rawEdits = Array.isArray(raw?.ai_edits) ? raw.ai_edits : [];
+  const ai_edits = rawEdits
+    .map((edit: any) => {
+      const note = edit?.note ? String(edit.note).trim() : "";
+      if (!note) return null;
+      return {
+        type: coerce(edit?.type, ADAPTATION_CHANGE_TYPE, "other"),
+        note,
+        source_ref: edit?.source_ref ? String(edit.source_ref) : undefined,
+      };
+    })
+    .filter(Boolean) as SceneAdaptation["ai_edits"];
+
+  return {
+    strategy: coerce(raw?.strategy, ADAPTATION_STRATEGY, "rewritten"),
+    ai_edits: ai_edits.length
+      ? ai_edits
+      : [
+          {
+            type: "rewrite",
+            source_ref: `P${refs[0].paragraph_start}-P${refs[0].paragraph_end}`,
+            note: "将原文章节内容改写为剧本场景，具体删改未由模型细分。",
+          },
+        ],
   };
 }
 
@@ -222,7 +296,7 @@ export async function* runPipeline(
     for (const chapter of chapters) {
       try {
         const out = await generateScenesForChapter({ chapter, knownCharacters: knownChars, knownLocations: knownLocs });
-        const mapped = (out.scenes ?? []).map((s, i) => mapScene(s, chapter.index, i + 1, nameToId));
+        const mapped = (out.scenes ?? []).map((s, i) => mapScene(s, chapter, i + 1, nameToId));
         scenes.push(...(mapped.length ? mapped : baseline.scenes.filter((s) => s.source_chapter === chapter.index)));
         (out.adaptation_notes ?? []).forEach((n: any) =>
           adaptationNotes.push({ type: coerce(n?.type, ["compression", "merge", "cut", "inference", "reorder", "other"] as const, "other"), note: String(n?.note ?? ""), scene_id: n?.scene_id }),

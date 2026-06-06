@@ -109,6 +109,12 @@ scenes:
     location_id: loc_1
     time: night
     source_chapter: 1
+    source_refs:
+      - chapter_index: 1
+        chapter_title: 第一章 风雪夜
+        paragraph_start: 1
+        paragraph_end: 6
+        excerpt: 边城的雪下了整整三日，青石街上早已没了行人。山海客栈的灯笼在风里摇晃。一个青衣男子踏雪而来，肩头落满白雪，腰间一柄旧剑用布条缠着。
     summary: 沈砚冒雪投宿，老掌柜察觉其缠布之剑而心生警觉。
     characters:
       - char_1
@@ -116,6 +122,18 @@ scenes:
     mood: 压抑
     pace: medium
     conflict: 老掌柜对神秘剑客的戒备。
+    adaptation:
+      strategy: compressed
+      ai_edits:
+        - type: compression
+          source_ref: P1-P2
+          note: 将原文两段环境与人物入场描写压缩为旁白和动作。
+        - type: cut
+          source_ref: P5
+          note: 删去老掌柜介绍房间的过渡台词，保留投宿关系即可。
+        - type: rewrite
+          source_ref: P6
+          note: 将“楼梯吱呀作响”的叙述改写为动作收束。
     elements:
       - type: narration
         text: 边城大雪三日，青石街空无一人，山海客栈的灯笼在风里摇晃。
@@ -140,6 +158,12 @@ scenes:
     location_id: loc_1
     time: dawn
     source_chapter: 2
+    source_refs:
+      - chapter_index: 2
+        chapter_title: 第二章 旧识
+        paragraph_start: 1
+        paragraph_end: 6
+        excerpt: 天未亮，望江楼的方向传来一声闷响。客栈后院里，一个黑衣人翻墙而入，正是十年前镖局一案的旧识——周霖。
     summary: 旧识周霖翻墙而入，与沈砚就镖局纵火案隔院对峙。
     characters:
       - char_1
@@ -147,6 +171,18 @@ scenes:
     mood: 紧张
     pace: fast
     conflict: 周霖逼问，沈砚否认纵火。
+    adaptation:
+      strategy: compressed
+      ai_edits:
+        - type: compression
+          source_ref: P1-P2
+          note: 将沈砚惊醒与周霖翻墙合并为后院建场动作。
+        - type: cut
+          source_ref: P5
+          note: 暂删“证物就在你手里”台词，使本场冲突集中在纵火指控。
+        - type: compression
+          source_ref: P6
+          note: 压缩老掌柜躲藏的旁支反应，保留两人对峙。
     elements:
       - type: narration
         text: 天未亮，望江楼方向传来一声闷响。
@@ -170,6 +206,12 @@ scenes:
     location_id: loc_2
     time: noon
     source_chapter: 3
+    source_refs:
+      - chapter_index: 3
+        chapter_title: 第三章 真相
+        paragraph_start: 1
+        paragraph_end: 5
+        excerpt: 正午，雪停了。青石街尽头的茶馆里，沈砚与周霖相对而坐。沈砚叹道：“这剑是镖局总镖头临终交给我的，剑里藏着真正纵火者的名字。”
     summary: 沈砚道出剑中藏有真正纵火者之名，周霖动摇。
     characters:
       - char_1
@@ -177,6 +219,18 @@ scenes:
     mood: 温情
     pace: slow
     conflict: 十年误解的化解起点。
+    adaptation:
+      strategy: faithful
+      ai_edits:
+        - type: compression
+          source_ref: P1
+          note: 将茶馆环境压缩为简短动作开场。
+        - type: cut
+          source_ref: P4
+          note: 暂删沈砚“十年来寻找答案”的补充台词，避免本场信息量过满。
+        - type: rewrite
+          source_ref: P5
+          note: 将结尾叙述保留为旁白，并追加“淡出”转场。
     elements:
       - type: action
         text: 沈砚将缠布的剑放在桌上。

@@ -21,6 +21,16 @@ const BASE_RULES = `你是资深剧本改编师与故事分析师。你的输出
 4. 允许进行剧本化的压缩、合并、删减与改写。
 5. 所有文本字段使用简体中文。`;
 
+function numberParagraphs(text: string): string {
+  const paragraphs = text
+    .split(/\n+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  return paragraphs.length
+    ? paragraphs.map((p, i) => `P${i + 1}: ${p}`).join("\n")
+    : "P1: （本章正文为空）";
+}
+
 // 1) 章节级分析
 export function chapterAnalysisPrompt(chapter: {
   index: number;
@@ -101,6 +111,8 @@ export function sceneGenerationPrompt(args: {
 - elements 必须按时间顺序排列，type 仅限 dialogue/action/narration/transition。
 - dialogue 必须带 character_name；动作描写用 action；环境/心理旁白用 narration；转场用 transition。
 - 为每场标注 mood（情绪）与 pace（slow|medium|fast）。
+- 每场必须标注 source_refs：来自本章哪几段原文，paragraph_start/paragraph_end 使用从 1 开始的段落序号，excerpt 保留对应原文短摘录。
+- 每场必须标注 adaptation：说明本场整体改编策略，以及 AI 对原文做了哪些压缩、合并、删减、重写、推断或重排。
 - 若对原文做了压缩/合并/删减，写入 adaptation_notes。
 - 不确定、需作者定夺的内容写入 open_questions。
 
@@ -110,11 +122,16 @@ export function sceneGenerationPrompt(args: {
     "heading":"内景/外景 地点 - 时间，如：内景 客栈大堂 - 夜",
     "location_id":"loc_xxx 或空字符串",
     "time":"dawn|morning|noon|afternoon|evening|night|unspecified",
+    "source_refs":[{"chapter_index":1,"chapter_title":"章节标题","paragraph_start":1,"paragraph_end":3,"excerpt":"对应原文短摘录"}],
     "summary":"本场摘要",
     "characters":["char_xxx"],
     "mood":"情绪基调",
     "pace":"slow|medium|fast",
     "conflict":"本场冲突/转折，可空",
+    "adaptation":{
+      "strategy":"faithful|compressed|merged|rewritten|inferred",
+      "ai_edits":[{"type":"compression|merge|cut|rewrite|inference|reorder|other","source_ref":"P1-P3","note":"删改说明"}]
+    },
     "elements":[
       {"type":"narration","text":"..."},
       {"type":"action","text":"..."},
@@ -129,8 +146,8 @@ export function sceneGenerationPrompt(args: {
 章节标题：${args.chapterTitle}
 已知人物表：${args.knownCharacters}
 已知地点表：${args.knownLocations}
-章节正文：
-${args.chapterContent}`,
+章节正文（已按原文自然段编号，source_refs 必须引用这些编号）：
+${numberParagraphs(args.chapterContent)}`,
   };
 }
 

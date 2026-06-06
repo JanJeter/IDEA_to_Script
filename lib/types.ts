@@ -18,6 +18,25 @@ export interface SceneElement {
   emotion?: string;
 }
 
+export interface SourceReference {
+  chapter_index: number;
+  chapter_title?: string;
+  paragraph_start: number;
+  paragraph_end: number;
+  excerpt: string;
+}
+
+export interface AdaptationChange {
+  type: "compression" | "merge" | "cut" | "rewrite" | "inference" | "reorder" | "other";
+  note: string;
+  source_ref?: string;
+}
+
+export interface SceneAdaptation {
+  strategy: "faithful" | "compressed" | "merged" | "rewritten" | "inferred";
+  ai_edits: AdaptationChange[];
+}
+
 export type TimeOfDay =
   | "dawn"
   | "morning"
@@ -34,11 +53,13 @@ export interface Scene {
   location_id?: string;
   time?: TimeOfDay;
   source_chapter?: number;
+  source_refs?: SourceReference[];
   summary?: string;
   characters?: string[];
   mood?: string;
   pace?: "slow" | "medium" | "fast" | "unspecified";
   conflict?: string;
+  adaptation?: SceneAdaptation;
   elements: SceneElement[];
 }
 
