@@ -1,0 +1,39 @@
+# 「Schema 校验失败」示例。运行 `node scripts/validate.mjs examples/invalid-example.yaml`
+# 会退出码非 0 并列出以下错误：
+#
+#   1) source/chapter_count must be >= 3
+#      —— chapter_count 为 2，违反「至少 3 章」约束（minimum: 3）。
+#   2) characters/0/id must match pattern "^char_[a-zA-Z0-9_]+$"
+#      —— id 写成 "c1"，缺少 char_ 前缀。
+#   3) scenes/0 must have required property 'heading'
+#      —— 场景缺少必填的 heading。
+#   4) scenes/0/elements/0/type must be equal to one of the allowed values
+#      —— type 为 "monologue"，不在 dialogue/action/narration/transition 之内。
+#   5) scenes/0/elements/1 must have required property 'text'
+#      —— dialogue 元素缺少 text。
+metadata:
+  title: 错误示例
+  format: drama
+  language: zh-CN
+source:
+  novel_title: 测试小说
+  chapter_count: 2          # ❌ 错误 1：必须 >= 3
+characters:
+  - id: c1                  # ❌ 错误 2：id 必须匹配 ^char_...
+    name: 张三
+locations:
+  - id: loc_1
+    name: 街角
+timeline:
+  - id: tl_1
+    order: 0
+    label: 开场
+scenes:
+  - id: scene_c1_s1
+    # ❌ 错误 3：缺少 heading
+    source_chapter: 1
+    elements:
+      - type: monologue     # ❌ 错误 4：非法枚举值
+        text: 自言自语。
+      - type: dialogue      # ❌ 错误 5：缺少 text
+        character_name: 张三
