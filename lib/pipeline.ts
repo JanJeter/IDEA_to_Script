@@ -135,8 +135,9 @@ export async function* runPipeline(
   rawText: string,
   options: ConvertOptions = {},
 ): AsyncGenerator<ConvertEvent> {
-  const mock = isMockMode();
-  const mode: "ai" | "mock" = mock ? "mock" : "ai";
+  // 强制使用 AI 模式（忽略环境变量配置）
+  const mock = false;
+  const mode: "ai" | "mock" = "ai";
 
   // —— 第 1 步：章节解析（确定性）——
   yield { type: "step", key: "parse", label: "章节解析", status: "running" };
@@ -160,17 +161,18 @@ export async function* runPipeline(
   // 始终先算一份 mock 基线，保证任何 AI 步骤失败都能完整兜底。
   const baseline = generateMockScreenplay(chapters, options);
 
-  if (mock) {
-    yield { type: "step", key: "analyze", label: "章节级分析", status: "running" };
-    yield { type: "step", key: "analyze", label: "章节级分析", status: "done", detail: "mock 模式：基于规则抽取" };
-    yield { type: "step", key: "aggregate", label: "人物/世界观汇总", status: "running" };
-    yield { type: "step", key: "aggregate", label: "人物/世界观汇总", status: "done", detail: `${baseline.characters.length} 人物 / ${baseline.locations.length} 地点` };
-    yield { type: "step", key: "scenes", label: "分场剧本生成", status: "running" };
-    yield { type: "step", key: "scenes", label: "分场剧本生成", status: "done", detail: `${baseline.scenes.length} 场` };
-
-    yield* finalize(baseline, "mock", chapters);
-    return;
-  }
+  // 已强制使用 AI 模式，跳过 mock 分支
+  // if (mock) {
+  //   yield { type: "step", key: "analyze", label: "章节级分析", status: "running" };
+  //   yield { type: "step", key: "analyze", label: "章节级分析", status: "done", detail: "mock 模式：基于规则抽取" };
+  //   yield { type: "step", key: "aggregate", label: "人物/世界观汇总", status: "running" };
+  //   yield { type: "step", key: "aggregate", label: "人物/世界观汇总", status: "done", detail: `${baseline.characters.length} 人物 / ${baseline.locations.length} 地点` };
+  //   yield { type: "step", key: "scenes", label: "分场剧本生成", status: "running" };
+  //   yield { type: "step", key: "scenes", label: "分场剧本生成", status: "done", detail: `${baseline.scenes.length} 场` };
+  //
+  //   yield* finalize(baseline, "mock", chapters);
+  //   return;
+  // }
 
   // —— AI 模式 ——
   let screenplay = baseline;
@@ -214,8 +216,8 @@ export async function* runPipeline(
     const knownChars = screenplay.characters.map((c) => ({ id: c.id, name: c.name, aliases: c.aliases }));
     const knownLocs = screenplay.locations.map((l) => ({ id: l.id, name: l.name }));
     const scenes: Scene[] = [];
-    const adaptationNotes = [...(screenplay.adaptation_notes ?? [])];
-    const openQuestions = [...(screenplay.open_questions ?? [])];
+    const adaptationNotes: any[] = [];
+    const openQuestions: any[] = [];
 
     for (const chapter of chapters) {
       try {
