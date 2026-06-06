@@ -8,6 +8,9 @@ import {
   extractWorldview,
   generateScenesForChapter,
   repairAgainstSchema,
+  reviewContentSafety,
+  type SafetyReviewOutput,
+  type SafetyTarget,
 } from "./ai";
 import { validateScreenplay, screenplaySchema, type ValidationResult } from "./schema";
 import { toYaml } from "./yaml";
@@ -44,6 +47,19 @@ export type ConvertEvent =
 const TIME_ENUM: TimeOfDay[] = ["dawn", "morning", "noon", "afternoon", "evening", "night", "unspecified"];
 const ADAPTATION_STRATEGY = ["faithful", "compressed", "merged", "rewritten", "inferred"] as const;
 const ADAPTATION_CHANGE_TYPE = ["compression", "merge", "cut", "rewrite", "inference", "reorder", "other"] as const;
+
+async function runSafetyReview(target: SafetyTarget, content: string): Promise<SafetyReviewOutput> {
+  try {
+    return await reviewContentSafety({ target, content });
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : "模型调用失败";
+    return `BLOCK: 内容安全审查失败：${detail}`;
+  }
+}
+
+function isBlocked(review: SafetyReviewOutput): boolean {
+  return review.startsWith("BLOCK:");
+}
 
 function coerce<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
   return typeof value === "string" && (allowed as readonly string[]).includes(value)
@@ -242,6 +258,15 @@ export async function* runPipeline(
   const mock = isMockMode();
   const mode: "ai" | "mock" = mock ? "mock" : "ai";
 
+  yield { type: "step", key: "source_review", label: "原文安全审核", status: "running" };
+  const sourceReview = await runSafetyReview("source", rawText.slice(0, 2000));
+  if (isBlocked(sourceReview)) {
+    yield { type: "step", key: "source_review", label: "原文安全审核", status: "failed", detail: sourceReview };
+    yield { type: "error", message: sourceReview };
+    return;
+  }
+  yield { type: "step", key: "source_review", label: "原文安全审核", status: "done", detail: sourceReview };
+
   // —— 第 1 步：章节解析（确定性）——
   yield { type: "step", key: "parse", label: "章节解析", status: "running" };
   let chapters: Chapter[];
@@ -395,11 +420,27 @@ async function* finalize(
     detail: validation.valid ? "通过" : `${validation.errors.length} 处错误`,
   };
 
+  const yaml = toYaml(final);
+  yield { type: "step", key: "screenplay_review", label: "剧本安全审核", status: "running" };
+  const screenplayReview = await runSafetyReview("screenplay", yaml);
+  if (isBlocked(screenplayReview)) {
+    yield {
+      type: "step",
+      key: "screenplay_review",
+      label: "剧本安全审核",
+      status: "failed",
+      detail: screenplayReview,
+    };
+    yield { type: "error", message: screenplayReview };
+    return;
+  }
+  yield { type: "step", key: "screenplay_review", label: "剧本安全审核", status: "done", detail: screenplayReview };
+
   yield {
     type: "result",
     mode,
     screenplay: final,
-    yaml: toYaml(final),
+    yaml,
     validation,
     chapters: chapters.map((c) => ({ index: c.index, title: c.title, summary: c.summary })),
   };
