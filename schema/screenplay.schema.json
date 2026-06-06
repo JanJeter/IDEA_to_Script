@@ -1,0 +1,253 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://aitransfer.local/schemas/screenplay.schema.json",
+  "title": "Screenplay",
+  "description": "AI 小说转剧本工具的剧本结构定义。最终以 YAML 序列化，但用 JSON Schema 描述以便用 ajv 校验。",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["metadata", "source", "characters", "locations", "timeline", "scenes"],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "description": "剧本元信息",
+      "additionalProperties": true,
+      "required": ["title", "format", "language"],
+      "properties": {
+        "title": { "type": "string", "minLength": 1, "description": "剧本标题" },
+        "logline": { "type": "string", "description": "一句话故事梗概" },
+        "genre": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "题材标签，如 玄幻 / 悬疑 / 爱情"
+        },
+        "format": {
+          "type": "string",
+          "enum": ["film", "tv", "short", "stage", "radio", "drama"],
+          "description": "剧本载体：电影/电视剧/短剧/舞台剧/广播剧/通用戏剧"
+        },
+        "language": { "type": "string", "description": "剧本语言，如 zh-CN" },
+        "created_at": { "type": "string", "description": "生成时间（ISO 8601）" },
+        "generator": { "type": "string", "description": "生成工具与版本" }
+      }
+    },
+    "source": {
+      "type": "object",
+      "description": "原小说来源信息，用于回溯与版权追踪",
+      "additionalProperties": true,
+      "required": ["novel_title", "chapter_count"],
+      "properties": {
+        "novel_title": { "type": "string", "description": "原小说标题（未知可填 未命名小说）" },
+        "author": { "type": "string", "description": "原作者" },
+        "chapter_count": { "type": "integer", "minimum": 3, "description": "识别到的章节数，必须 >= 3" },
+        "total_length": { "type": "integer", "minimum": 0, "description": "原文字符总数" },
+        "source_chapters": {
+          "type": "array",
+          "description": "章节索引表，仅存标题与摘要，便于剧本回溯原文章节",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": ["index", "title"],
+            "properties": {
+              "index": { "type": "integer", "minimum": 1 },
+              "title": { "type": "string" },
+              "summary": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "characters": {
+      "type": "array",
+      "description": "人物表",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["id", "name"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^char_[a-zA-Z0-9_]+$", "description": "稳定引用 ID" },
+          "name": { "type": "string", "minLength": 1 },
+          "aliases": { "type": "array", "items": { "type": "string" } },
+          "role": {
+            "type": "string",
+            "enum": ["protagonist", "antagonist", "supporting", "minor", "narrator", "unknown"],
+            "description": "戏剧角色定位"
+          },
+          "description": { "type": "string" },
+          "traits": { "type": "array", "items": { "type": "string" } },
+          "arc": { "type": "string", "description": "人物弧光/成长线" }
+        }
+      }
+    },
+    "locations": {
+      "type": "array",
+      "description": "场景地点表",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["id", "name"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^loc_[a-zA-Z0-9_]+$" },
+          "name": { "type": "string", "minLength": 1 },
+          "type": {
+            "type": "string",
+            "enum": ["interior", "exterior", "mixed", "unknown"],
+            "description": "内景/外景/内外混合/未知"
+          },
+          "description": { "type": "string" },
+          "source_chapters": { "type": "array", "items": { "type": "integer" } }
+        }
+      }
+    },
+    "timeline": {
+      "type": "array",
+      "description": "时间线节点，串联剧情发展顺序",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["id", "order", "label"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^tl_[a-zA-Z0-9_]+$" },
+          "order": { "type": "integer", "minimum": 0, "description": "排序键，越小越早" },
+          "label": { "type": "string", "description": "时间节点标签，如 第一日清晨" },
+          "time_of_day": {
+            "type": "string",
+            "enum": ["dawn", "morning", "noon", "afternoon", "evening", "night", "unspecified"]
+          },
+          "description": { "type": "string" },
+          "related_scenes": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "acts": {
+      "type": "array",
+      "description": "分幕结构（电影/舞台剧常用）。与 episodes 二选一或并存。",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["id", "title", "scene_ids"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^act_[a-zA-Z0-9_]+$" },
+          "title": { "type": "string" },
+          "summary": { "type": "string" },
+          "scene_ids": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "episodes": {
+      "type": "array",
+      "description": "分集结构（电视剧/短剧常用）。",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["id", "title", "scene_ids"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^ep_[a-zA-Z0-9_]+$" },
+          "title": { "type": "string" },
+          "summary": { "type": "string" },
+          "scene_ids": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "scenes": {
+      "type": "array",
+      "description": "核心结构：分场。dialogue/action/narration/transition 作为 elements 的有类型条目内联其中。",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["id", "heading", "elements"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^scene_[a-zA-Z0-9_]+$" },
+          "heading": { "type": "string", "minLength": 1, "description": "场景标题行，如 内景 客栈大堂 - 夜" },
+          "slug": { "type": "string", "description": "简短机读标识" },
+          "location_id": { "type": "string", "description": "引用 locations[].id" },
+          "time": {
+            "type": "string",
+            "enum": ["dawn", "morning", "noon", "afternoon", "evening", "night", "unspecified"]
+          },
+          "source_chapter": { "type": "integer", "minimum": 1, "description": "来源章节索引，保证可回溯" },
+          "summary": { "type": "string", "description": "本场剧情摘要" },
+          "characters": { "type": "array", "items": { "type": "string" }, "description": "出场人物 id 列表" },
+          "mood": { "type": "string", "description": "情绪基调，如 紧张 / 温情 / 压抑" },
+          "pace": {
+            "type": "string",
+            "enum": ["slow", "medium", "fast", "unspecified"],
+            "description": "节奏标记"
+          },
+          "conflict": { "type": "string", "description": "本场核心冲突或转折" },
+          "elements": {
+            "type": "array",
+            "description": "按时间顺序排列的剧本元素：对白/动作/旁白/转场",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": ["type"],
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": ["dialogue", "action", "narration", "transition"]
+                },
+                "character_id": { "type": "string", "description": "type=dialogue 时的说话人，引用 characters[].id" },
+                "character_name": { "type": "string", "description": "冗余存名字，便于人眼阅读" },
+                "text": { "type": "string", "description": "台词/动作描写/旁白内容" },
+                "parenthetical": { "type": "string", "description": "台词附注，如 （冷笑）" },
+                "emotion": { "type": "string", "description": "情绪标记，如 愤怒 / 哽咽" }
+              },
+              "allOf": [
+                {
+                  "if": { "properties": { "type": { "const": "dialogue" } } },
+                  "then": { "required": ["text"] }
+                },
+                {
+                  "if": { "properties": { "type": { "const": "action" } } },
+                  "then": { "required": ["text"] }
+                },
+                {
+                  "if": { "properties": { "type": { "const": "narration" } } },
+                  "then": { "required": ["text"] }
+                },
+                {
+                  "if": { "properties": { "type": { "const": "transition" } } },
+                  "then": { "required": ["text"] }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "adaptation_notes": {
+      "type": "array",
+      "description": "改编说明：记录压缩/合并/删减/推断等改编操作，便于作者审阅",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["type", "note"],
+        "properties": {
+          "scene_id": { "type": "string" },
+          "type": {
+            "type": "string",
+            "enum": ["compression", "merge", "cut", "inference", "reorder", "other"]
+          },
+          "note": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "open_questions": {
+      "type": "array",
+      "description": "未解决问题 / 待作者确认项",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["id", "question"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^q_[a-zA-Z0-9_]+$" },
+          "question": { "type": "string", "minLength": 1 },
+          "context": { "type": "string" },
+          "scene_id": { "type": "string" }
+        }
+      }
+    }
+  }
+}
