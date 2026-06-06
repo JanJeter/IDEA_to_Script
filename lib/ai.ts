@@ -10,7 +10,9 @@ import {
 import type { Chapter } from "./types";
 
 export function isMockMode(): boolean {
+  console.log('OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? '已设置' : '未设置');
   if (process.env.USE_MOCK === "1") return true;
+  console.log('OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? '已设置' : '未设置');
   return !process.env.OPENAI_API_KEY;
 }
 
