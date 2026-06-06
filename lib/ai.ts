@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import {
   chapterAnalysisPrompt,
   characterExtractionPrompt,
+  characterResolutionPrompt,
   worldviewPrompt,
   sceneGenerationPrompt,
   schemaRepairPrompt,
@@ -10,9 +11,7 @@ import {
 import type { Chapter } from "./types";
 
 export function isMockMode(): boolean {
-  console.log('OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? '已设置' : '未设置');
   if (process.env.USE_MOCK === "1") return true;
-  console.log('OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? '已设置' : '未设置');
   return !process.env.OPENAI_API_KEY;
 }
 
@@ -67,6 +66,16 @@ export function analyzeChapter(chapter: Chapter): Promise<ChapterAnalysis> {
 
 export function aggregateCharacters(perChapterCharacters: unknown): Promise<{ characters: any[] }> {
   return callJson(characterExtractionPrompt(JSON.stringify(perChapterCharacters)));
+}
+
+export function resolveCharacters(args: {
+  chapters: Chapter[];
+  chapterAnalyses: unknown;
+}): Promise<{ characters: any[] }> {
+  return callJson(characterResolutionPrompt({
+    chapters: args.chapters,
+    chapterAnalyses: args.chapterAnalyses,
+  }));
 }
 
 export function extractWorldview(summaries: string[]): Promise<{
