@@ -1,3 +1,6 @@
+# Demo Address:
+【七牛云第三批次：题目三：AI小说转剧本工具】 https://www.bilibili.com/video/BV11wE46hEuF/?share_source=copy_web&vd_source=55e18e0c75cf43bef167cc617d7b1447
+
 # AI Novel-to-Screenplay Converter
 
 Convert multi-chapter novels into **structured, verifiable, and editable** YAML screenplay drafts quickly.
