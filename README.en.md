@@ -34,6 +34,9 @@ click "**Start Conversion**" → the YAML screenplay appears on the right, ready
 
 Or you can copy your own novel text, paste it into the input box, click "**Start Conversion**" → the YAML screenplay appears on the right, ready to copy / download / validate.
 
+After conversion:
+![alt text](转换后切换到yaml脚本.png)
+
 ---
 
 ## Validation Without Starting the Server
