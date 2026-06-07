@@ -1,3 +1,6 @@
+# Demo 演示地址：
+【七牛云第三批次：题目三：AI小说转剧本工具】 https://www.bilibili.com/video/BV11wE46hEuF/?share_source=copy_web&vd_source=55e18e0c75cf43bef167cc617d7b1447
+
 # AI 小说转剧本工具
 
 把多章节小说快速转换为**结构化、可校验、可二次编辑**的 YAML 剧本初稿。
