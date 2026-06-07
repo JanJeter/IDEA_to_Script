@@ -24,8 +24,15 @@ cp .env.example .env
 npm run dev
 #   Open http://localhost:3000
 ```
+first coming:
+![alt text](首页.png)
+Once opened: click "**Load Sample**" on the left → 
+![alt text](载入示例.png)
 
-Once opened: click "**Load Sample**" on the left → click "**Start Conversion**" → the YAML screenplay appears on the right, ready to copy / download / validate.
+click "**Start Conversion**" → the YAML screenplay appears on the right, ready to copy / download / validate.
+![alt text](开始转换.png)
+
+Or you can copy your own novel text, paste it into the input box, click "**Start Conversion**" → the YAML screenplay appears on the right, ready to copy / download / validate.
 
 ---
 
