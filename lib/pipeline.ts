@@ -9,15 +9,18 @@ import {
   generateScenesForChapter,
   repairAgainstSchema,
   reviewContentSafety,
+  type ChapterAnalysis,
   type SafetyReviewOutput,
   type SafetyTarget,
 } from "./ai";
 import { validateScreenplay, screenplaySchema, type ValidationResult } from "./schema";
 import { toYaml } from "./yaml";
 import type {
+  AdaptationNote,
   Chapter,
   Character,
   Location,
+  OpenQuestion,
   Scene,
   SceneAdaptation,
   SceneElement,
@@ -45,15 +48,63 @@ export type ConvertEvent =
   | { type: "error"; message: string };
 
 const TIME_ENUM: TimeOfDay[] = ["dawn", "morning", "noon", "afternoon", "evening", "night", "unspecified"];
+const PACE_ENUM = ["slow", "medium", "fast", "unspecified"] as const;
 const ADAPTATION_STRATEGY = ["faithful", "compressed", "merged", "rewritten", "inferred"] as const;
 const ADAPTATION_CHANGE_TYPE = ["compression", "merge", "cut", "rewrite", "inference", "reorder", "other"] as const;
+const NOTE_CHANGE_TYPE = ["compression", "merge", "cut", "inference", "reorder", "other"] as const;
+
+interface ChapterSceneResult {
+  scenes: Scene[];
+  adaptationNotes: AdaptationNote[];
+  openQuestions: OpenQuestion[];
+}
+
+function now(): number {
+  return Date.now();
+}
+
+function elapsedSince(start: number): string {
+  const ms = Date.now() - start;
+  return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
+}
+
+function detailWithTiming(detail: string, start: number): string {
+  return `${detail} (${elapsedSince(start)})`;
+}
+
+function getSceneConcurrency(): number {
+  const raw = Number(process.env.AI_SCENE_CONCURRENCY ?? 3);
+  if (!Number.isFinite(raw)) return 3;
+  return Math.max(1, Math.min(8, Math.floor(raw)));
+}
+
+async function parallelMapLimit<T, R>(
+  items: readonly T[],
+  limit: number,
+  mapper: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+
+  async function worker(): Promise<void> {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(items[index], index);
+    }
+  }
+
+  const workerCount = Math.min(limit, items.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  return results;
+}
 
 async function runSafetyReview(target: SafetyTarget, content: string): Promise<SafetyReviewOutput> {
   try {
     return await reviewContentSafety({ target, content });
   } catch (e) {
-    const detail = e instanceof Error ? e.message : "模型调用失败";
-    return `BLOCK: 内容安全审查失败：${detail}`;
+    const detail = e instanceof Error ? e.message : "model call failed";
+    return `BLOCK: content safety review failed: ${detail}`;
   }
 }
 
@@ -67,7 +118,6 @@ function coerce<T extends string>(value: unknown, allowed: readonly T[], fallbac
     : fallback;
 }
 
-// 把 AI 返回的人物数组规整为带稳定 id 的 Character[]，并建立 名称/别名 -> id 映射。
 function mapCharacterEvidence(raw: any): SourceReference[] | undefined {
   if (!Array.isArray(raw)) return undefined;
   const evidence = raw
@@ -112,6 +162,15 @@ export function mapResolvedCharacters(raw: any[]): { characters: Character[]; na
   return { characters, nameToId };
 }
 
+function nameMapFromCharacters(characters: Character[]): Map<string, string> {
+  const nameToId = new Map<string, string>();
+  characters.forEach((c) => {
+    nameToId.set(c.name, c.id);
+    c.aliases?.forEach((alias) => nameToId.set(alias, c.id));
+  });
+  return nameToId;
+}
+
 function mapLocations(raw: any[]): { locations: Location[]; nameToId: Map<string, string> } {
   const nameToId = new Map<string, string>();
   const locations: Location[] = (raw ?? []).map((l, i) => {
@@ -129,12 +188,7 @@ function mapLocations(raw: any[]): { locations: Location[]; nameToId: Map<string
   return { locations, nameToId };
 }
 
-function mapScene(
-  raw: any,
-  chapter: Chapter,
-  sceneNo: number,
-  charNameToId: Map<string, string>,
-): Scene {
+function mapScene(raw: any, chapter: Chapter, sceneNo: number, charNameToId: Map<string, string>): Scene {
   const elements: SceneElement[] = (raw?.elements ?? [])
     .map((e: any): SceneElement | null => {
       const type = coerce(e?.type, ["dialogue", "action", "narration", "transition"] as const, "action");
@@ -176,7 +230,7 @@ function mapScene(
       ]),
     ],
     mood: raw?.mood ? String(raw.mood) : "平稳",
-    pace: coerce(raw?.pace, ["slow", "medium", "fast", "unspecified"] as const, "medium"),
+    pace: coerce(raw?.pace, PACE_ENUM, "medium"),
     conflict: raw?.conflict ? String(raw.conflict) : "",
     adaptation,
     elements,
@@ -185,7 +239,7 @@ function mapScene(
 
 function chapterExcerpt(chapter: Chapter, maxLen = 180): string {
   const clean = chapter.content.replace(/\s+/g, " ").trim() || chapter.summary || chapter.title;
-  return clean.length <= maxLen ? clean : clean.slice(0, maxLen) + "…";
+  return clean.length <= maxLen ? clean : `${clean.slice(0, maxLen)}...`;
 }
 
 function mapSourceRefs(raw: any, chapter: Chapter): SourceReference[] {
@@ -247,34 +301,45 @@ function mapAdaptation(raw: any, refs: SourceReference[]): SceneAdaptation {
   };
 }
 
-/**
- * 主转换管线。返回异步事件流，便于前端逐步展示进度。
- * 五步：①章节解析 ②章节级分析 ③人物/世界观汇总 ④分场生成 ⑤Schema 校验/修复。
- */
-export async function* runPipeline(
-  rawText: string,
-  options: ConvertOptions = {},
-): AsyncGenerator<ConvertEvent> {
+function mapAdaptationNote(raw: any, sceneId?: string): AdaptationNote {
+  return {
+    type: coerce(raw?.type, NOTE_CHANGE_TYPE, "other"),
+    note: String(raw?.note ?? ""),
+    scene_id: raw?.scene_id ? String(raw.scene_id) : sceneId,
+  };
+}
+
+async function resolveCharactersWithFallback(chapters: Chapter[], analyses: ChapterAnalysis[]): Promise<{ characters: any[] }> {
+  try {
+    return await resolveCharacters({ chapters, chapterAnalyses: analyses });
+  } catch {
+    const allChars = analyses.flatMap((a) => a.characters ?? []);
+    return aggregateCharacters(allChars);
+  }
+}
+
+export async function* runPipeline(rawText: string, options: ConvertOptions = {}): AsyncGenerator<ConvertEvent> {
   const mock = isMockMode();
   const mode: "ai" | "mock" = mock ? "mock" : "ai";
 
+  const sourceReviewStart = now();
   yield { type: "step", key: "source_review", label: "原文安全审核", status: "running" };
   const sourceReview = await runSafetyReview("source", rawText.slice(0, 2000));
   if (isBlocked(sourceReview)) {
-    yield { type: "step", key: "source_review", label: "原文安全审核", status: "failed", detail: sourceReview };
+    yield { type: "step", key: "source_review", label: "原文安全审核", status: "failed", detail: detailWithTiming(sourceReview, sourceReviewStart) };
     yield { type: "error", message: sourceReview };
     return;
   }
-  yield { type: "step", key: "source_review", label: "原文安全审核", status: "done", detail: sourceReview };
+  yield { type: "step", key: "source_review", label: "原文安全审核", status: "done", detail: detailWithTiming(sourceReview, sourceReviewStart) };
 
-  // —— 第 1 步：章节解析（确定性）——
+  const parseStart = now();
   yield { type: "step", key: "parse", label: "章节解析", status: "running" };
   let chapters: Chapter[];
   try {
     chapters = parseChapters(rawText);
   } catch (e) {
     const msg = e instanceof ChapterParseError ? e.message : "章节解析失败";
-    yield { type: "step", key: "parse", label: "章节解析", status: "failed", detail: msg };
+    yield { type: "step", key: "parse", label: "章节解析", status: "failed", detail: detailWithTiming(msg, parseStart) };
     yield { type: "error", message: msg };
     return;
   }
@@ -283,10 +348,9 @@ export async function* runPipeline(
     key: "parse",
     label: "章节解析",
     status: "done",
-    detail: `识别到 ${chapters.length} 个章节`,
+    detail: detailWithTiming(`识别到 ${chapters.length} 个章节`, parseStart),
   };
 
-  // 始终先算一份 mock 基线，保证任何 AI 步骤失败都能完整兜底。
   const baseline = generateMockScreenplay(chapters, options);
 
   if (mock) {
@@ -301,27 +365,30 @@ export async function* runPipeline(
     return;
   }
 
-  // —— AI 模式 ——
   let screenplay = baseline;
   try {
-    // 第 2 步：章节级分析
+    const analyzeStart = now();
     yield { type: "step", key: "analyze", label: "章节级分析", status: "running" };
-    const analyses = await Promise.all(chapters.map((c) => analyzeChapter(c)));
-    chapters.forEach((c, i) => (c.summary = analyses[i]?.summary || c.summary));
-    yield { type: "step", key: "analyze", label: "章节级分析", status: "done", detail: `${analyses.length} 章已分析` };
+    const analyses = await Promise.all(chapters.map((chapter) => analyzeChapter(chapter)));
+    chapters.forEach((chapter, i) => {
+      chapter.summary = analyses[i]?.summary || chapter.summary;
+    });
+    yield {
+      type: "step",
+      key: "analyze",
+      label: "章节级分析",
+      status: "done",
+      detail: detailWithTiming(`${analyses.length} 章已分析`, analyzeStart),
+    };
 
-    // 第 3 步：人物 + 世界观汇总
+    const aggregateStart = now();
     yield { type: "step", key: "aggregate", label: "人物/世界观汇总", status: "running" };
-    let charAgg: { characters: any[] };
-    try {
-      charAgg = await resolveCharacters({ chapters, chapterAnalyses: analyses });
-    } catch {
-      const allChars = analyses.flatMap((a) => a.characters ?? []);
-      charAgg = await aggregateCharacters(allChars);
-    }
-    const { characters, nameToId } = mapResolvedCharacters(charAgg.characters ?? []);
-
-    const worldview = await extractWorldview(chapters.map((c) => c.summary ?? ""));
+    const [charAgg, worldview] = await Promise.all([
+      resolveCharactersWithFallback(chapters, analyses),
+      extractWorldview(chapters.map((chapter) => chapter.summary ?? "")),
+    ]);
+    const mappedCharacters = mapResolvedCharacters(charAgg.characters ?? []);
+    const aiCharacters = mappedCharacters.characters;
     const { locations } = mapLocations(worldview.locations ?? []);
 
     screenplay = {
@@ -332,50 +399,67 @@ export async function* runPipeline(
         genre: Array.isArray(worldview.genre) ? worldview.genre : baseline.metadata.genre,
         generator: "aitransfer-script ai v0.1",
       },
-      characters: characters.length ? characters : baseline.characters,
+      characters: aiCharacters.length ? aiCharacters : baseline.characters,
       locations: locations.length ? locations : baseline.locations,
     };
+    const nameToId = aiCharacters.length ? mappedCharacters.nameToId : nameMapFromCharacters(screenplay.characters);
     yield {
       type: "step",
       key: "aggregate",
       label: "人物/世界观汇总",
       status: "done",
-      detail: `${screenplay.characters.length} 人物 / ${screenplay.locations.length} 地点`,
+      detail: detailWithTiming(`${screenplay.characters.length} 人物 / ${screenplay.locations.length} 地点`, aggregateStart),
     };
 
-    // 第 4 步：分场生成（逐章；单章失败回退该章 mock 场景）
-    yield { type: "step", key: "scenes", label: "分场剧本生成", status: "running" };
+    const scenesStart = now();
+    const concurrency = getSceneConcurrency();
+    yield { type: "step", key: "scenes", label: "分场剧本生成", status: "running", detail: `并发 ${concurrency}` };
     const knownChars = screenplay.characters.map((c) => ({
       id: c.id,
       name: c.name,
       aliases: c.aliases,
-      evidence: c.evidence,
-      confidence: c.confidence,
-      description: c.description,
     }));
     const knownLocs = screenplay.locations.map((l) => ({ id: l.id, name: l.name }));
-    const scenes: Scene[] = [];
-    const adaptationNotes: any[] = [];
-    const openQuestions: any[] = [];
 
-    for (const chapter of chapters) {
+    const perChapter = await parallelMapLimit<Chapter, ChapterSceneResult>(chapters, concurrency, async (chapter) => {
       try {
         const out = await generateScenesForChapter({ chapter, knownCharacters: knownChars, knownLocations: knownLocs });
-        const mapped = (out.scenes ?? []).map((s, i) => mapScene(s, chapter, i + 1, nameToId));
-        scenes.push(...(mapped.length ? mapped : baseline.scenes.filter((s) => s.source_chapter === chapter.index)));
-        (out.adaptation_notes ?? []).forEach((n: any) =>
-          adaptationNotes.push({ type: coerce(n?.type, ["compression", "merge", "cut", "inference", "reorder", "other"] as const, "other"), note: String(n?.note ?? ""), scene_id: n?.scene_id }),
-        );
-        (out.open_questions ?? []).forEach((q: any, idx: number) =>
-          openQuestions.push({ id: `q_c${chapter.index}_${idx + 1}`, question: String(q?.question ?? ""), context: q?.context ? String(q.context) : undefined }),
-        );
+        const scenes = (out.scenes ?? []).map((s, i) => mapScene(s, chapter, i + 1, nameToId));
+        return {
+          scenes: scenes.length ? scenes : baseline.scenes.filter((s) => s.source_chapter === chapter.index),
+          adaptationNotes: (out.adaptation_notes ?? []).map((n: any) => mapAdaptationNote(n)),
+          openQuestions: (out.open_questions ?? []).map((q: any, idx: number) => ({
+            id: `q_c${chapter.index}_${idx + 1}`,
+            question: String(q?.question ?? ""),
+            context: q?.context ? String(q.context) : undefined,
+          })),
+        };
       } catch {
-        scenes.push(...baseline.scenes.filter((s) => s.source_chapter === chapter.index));
-        adaptationNotes.push({ type: "inference", note: `第 ${chapter.index} 章 AI 分场失败，已回退规则生成。` });
+        return {
+          scenes: baseline.scenes.filter((s) => s.source_chapter === chapter.index),
+          adaptationNotes: [
+            {
+              type: "inference" as const,
+              note: `第 ${chapter.index} 章 AI 分场失败，已回退规则生成。`,
+              scene_id: undefined,
+            },
+          ],
+          openQuestions: [],
+        };
       }
-    }
+    });
+
+    const scenes = perChapter.flatMap((result) => result.scenes);
+    const adaptationNotes = perChapter.flatMap((result) => result.adaptationNotes);
+    const openQuestions = perChapter.flatMap((result) => result.openQuestions);
     screenplay = { ...screenplay, scenes, adaptation_notes: adaptationNotes, open_questions: openQuestions };
-    yield { type: "step", key: "scenes", label: "分场剧本生成", status: "done", detail: `${scenes.length} 场` };
+    yield {
+      type: "step",
+      key: "scenes",
+      label: "分场剧本生成",
+      status: "done",
+      detail: detailWithTiming(`${scenes.length} 场，并发 ${concurrency}`, scenesStart),
+    };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "AI 转换失败";
     yield { type: "step", key: "scenes", label: "分场剧本生成", status: "failed", detail: `${msg}（已回退 mock）` };
@@ -385,12 +469,8 @@ export async function* runPipeline(
   yield* finalize(screenplay, mode, chapters);
 }
 
-// —— 第 5 步：Schema 校验 + 修复 + 序列化 ——
-async function* finalize(
-  screenplay: Screenplay,
-  mode: "ai" | "mock",
-  chapters: Chapter[],
-): AsyncGenerator<ConvertEvent> {
+async function* finalize(screenplay: Screenplay, mode: "ai" | "mock", chapters: Chapter[]): AsyncGenerator<ConvertEvent> {
+  const validateStart = now();
   yield { type: "step", key: "validate", label: "Schema 校验", status: "running" };
   let final = screenplay;
   let validation = validateScreenplay(final);
@@ -408,7 +488,7 @@ async function* finalize(
         validation = reval;
       }
     } catch {
-      /* 修复失败则保留原校验结果 */
+      // Keep the original validation result when repair fails.
     }
   }
 
@@ -417,10 +497,11 @@ async function* finalize(
     key: "validate",
     label: "Schema 校验",
     status: validation.valid ? "done" : "failed",
-    detail: validation.valid ? "通过" : `${validation.errors.length} 处错误`,
+    detail: detailWithTiming(validation.valid ? "通过" : `${validation.errors.length} 处错误`, validateStart),
   };
 
   const yaml = toYaml(final);
+  const screenplayReviewStart = now();
   yield { type: "step", key: "screenplay_review", label: "剧本安全审核", status: "running" };
   const screenplayReview = await runSafetyReview("screenplay", yaml);
   if (isBlocked(screenplayReview)) {
@@ -429,12 +510,18 @@ async function* finalize(
       key: "screenplay_review",
       label: "剧本安全审核",
       status: "failed",
-      detail: screenplayReview,
+      detail: detailWithTiming(screenplayReview, screenplayReviewStart),
     };
     yield { type: "error", message: screenplayReview };
     return;
   }
-  yield { type: "step", key: "screenplay_review", label: "剧本安全审核", status: "done", detail: screenplayReview };
+  yield {
+    type: "step",
+    key: "screenplay_review",
+    label: "剧本安全审核",
+    status: "done",
+    detail: detailWithTiming(screenplayReview, screenplayReviewStart),
+  };
 
   yield {
     type: "result",
