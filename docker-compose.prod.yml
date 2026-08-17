@@ -1,0 +1,183 @@
+name: idea2screenplay-prod
+
+x-bounded-logging: &bounded-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-screenwriter}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}
+      POSTGRES_DB: ${POSTGRES_DB:-idea2screenplay}
+    volumes:
+      - idea2screenplay_prod_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-screenwriter} -d ${POSTGRES_DB:-idea2screenplay}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    shm_size: 128mb
+    mem_limit: 640m
+    pids_limit: 256
+    security_opt:
+      - no-new-privileges:true
+    logging: *bounded-logging
+    networks: [internal]
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-screenwriter}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-idea2screenplay}?schema=public
+      API_PORT: 3000
+      WEB_ORIGIN: https://${PUBLIC_IP:?Set PUBLIC_IP in .env.production}
+      COOKIE_SIGNING_KEY: ${COOKIE_SIGNING_KEY:?Set COOKIE_SIGNING_KEY in .env.production}
+      COOKIE_SIGNING_KEY_PREVIOUS: ${COOKIE_SIGNING_KEY_PREVIOUS:-}
+      VISITOR_IDENTITY_KEY: ${VISITOR_IDENTITY_KEY:?Set VISITOR_IDENTITY_KEY in .env.production}
+      IP_HASH_KEY: ${IP_HASH_KEY:?Set IP_HASH_KEY in .env.production}
+      ALTCHA_HMAC_KEY: ${ALTCHA_HMAC_KEY:?Set ALTCHA_HMAC_KEY in .env.production}
+      VISITOR_COOKIE_SECURE: "true"
+      ACCESS_CONTROL_REQUIRED: "true"
+      APP_ACCESS_CODES: ${APP_ACCESS_CODES:?Set APP_ACCESS_CODES in .env.production}
+      VISITOR_LAST_SEEN_WRITE_INTERVAL_MS: ${VISITOR_LAST_SEEN_WRITE_INTERVAL_MS:-300000}
+      VISITOR_RETENTION_DAYS: ${VISITOR_RETENTION_DAYS:-30}
+      VISITOR_PROJECT_LIMIT: ${VISITOR_PROJECT_LIMIT:-5}
+      IP_PROJECTS_PER_DAY: ${IP_PROJECTS_PER_DAY:-200}
+      VISITOR_GENERATIONS_PER_DAY: ${VISITOR_GENERATIONS_PER_DAY:-3}
+      IP_GENERATIONS_PER_DAY: ${IP_GENERATIONS_PER_DAY:-100}
+      GLOBAL_GENERATIONS_PER_DAY: ${GLOBAL_GENERATIONS_PER_DAY:-100}
+      GLOBAL_GENERATIONS_PER_MONTH: ${GLOBAL_GENERATIONS_PER_MONTH:-3000}
+      GENERATION_CONCURRENCY: ${GENERATION_CONCURRENCY:-2}
+      SERIALIZABLE_TRANSACTION_CONCURRENCY: ${SERIALIZABLE_TRANSACTION_CONCURRENCY:-1}
+      SERIALIZABLE_TRANSACTION_QUEUE_LIMIT: ${SERIALIZABLE_TRANSACTION_QUEUE_LIMIT:-256}
+      SERIALIZABLE_TRANSACTION_WAIT_TIMEOUT_MS: ${SERIALIZABLE_TRANSACTION_WAIT_TIMEOUT_MS:-15000}
+      JOB_RETRY_LIMIT: ${JOB_RETRY_LIMIT:-2}
+      JOB_EXPIRE_SECONDS: ${JOB_EXPIRE_SECONDS:-900}
+      PROJECT_REGENERATIONS_MAX: ${PROJECT_REGENERATIONS_MAX:-3}
+      ALTCHA_COST: ${ALTCHA_COST:-1000}
+      ALTCHA_CHALLENGES_PER_10_MINUTES: ${ALTCHA_CHALLENGES_PER_10_MINUTES:-20}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.deepseek.com}
+      LLM_MODEL: ${LLM_MODEL:-deepseek-chat}
+      LLM_TIMEOUT_MS: ${LLM_TIMEOUT_MS:-90000}
+      LLM_MAX_OUTPUT_TOKENS: ${LLM_MAX_OUTPUT_TOKENS:-4096}
+      DEMO_MODE: ${DEMO_MODE:-true}
+      GENERATION_RUNTIME: ${GENERATION_RUNTIME:-legacy}
+      AGENT_ENABLED_STAGES: ${AGENT_ENABLED_STAGES:-PREMISE}
+      AGENT_PREMISE_MAX_STEPS: ${AGENT_PREMISE_MAX_STEPS:-4}
+      AGENT_PREMISE_TOKEN_BUDGET: ${AGENT_PREMISE_TOKEN_BUDGET:-16000}
+      AGENT_TIMEOUT_MS: ${AGENT_TIMEOUT_MS:-90000}
+      TRENDS_FETCH_TTL_MS: ${TRENDS_FETCH_TTL_MS:-7200000}
+      TRENDS_STALE_AFTER_MS: ${TRENDS_STALE_AFTER_MS:-21600000}
+      TRENDS_REFRESH_INTERVAL_MS: ${TRENDS_REFRESH_INTERVAL_MS:-300000}
+      TRENDS_REFRESH_COOLDOWN_MS: ${TRENDS_REFRESH_COOLDOWN_MS:-60000}
+      TRENDS_RETENTION_DAYS: ${TRENDS_RETENTION_DAYS:-14}
+      TRENDS_SOURCE_TIMEOUT_MS: ${TRENDS_SOURCE_TIMEOUT_MS:-8000}
+      TRENDS_SOURCE_FAILURE_BACKOFF_MS: ${TRENDS_SOURCE_FAILURE_BACKOFF_MS:-300000}
+      TRENDS_MAX_RESPONSE_BYTES: ${TRENDS_MAX_RESPONSE_BYTES:-1048576}
+      TRENDS_USER_AGENT: ${TRENDS_USER_AGENT:-AIScriptTrendBot/0.1}
+      TRENDS_WIKIMEDIA_LIMIT: ${TRENDS_WIKIMEDIA_LIMIT:-24}
+      TRENDS_JSON_FEED_URL: ${TRENDS_JSON_FEED_URL:-}
+      TRENDS_JSON_FEED_LIMIT: ${TRENDS_JSON_FEED_LIMIT:-30}
+      TRENDS_QIANFAN_API_KEY: ${TRENDS_QIANFAN_API_KEY:-}
+      TRENDS_QIANFAN_BAIDU_TABS: ${TRENDS_QIANFAN_BAIDU_TABS:-livelihood,new_entertainment,finance}
+      TRENDS_QIANFAN_LIMIT_PER_TAB: ${TRENDS_QIANFAN_LIMIT_PER_TAB:-15}
+      TRENDS_X_BEARER_TOKEN: ${TRENDS_X_BEARER_TOKEN:-}
+      TRENDS_X_USE_CASE_APPROVED: ${TRENDS_X_USE_CASE_APPROVED:-false}
+      TRENDS_X_WOEIDS: ${TRENDS_X_WOEIDS:-23424977,23424975}
+      TRENDS_X_FETCH_TTL_MS: ${TRENDS_X_FETCH_TTL_MS:-1800000}
+      TRENDS_WEIBO_APP_KEY: ${TRENDS_WEIBO_APP_KEY:-}
+      TRENDS_WEIBO_ACCESS_TOKEN: ${TRENDS_WEIBO_ACCESS_TOKEN:-}
+      TRENDS_WEIBO_COMMERCIAL_APPROVED: ${TRENDS_WEIBO_COMMERCIAL_APPROVED:-false}
+      TRENDS_WEIBO_COUNT: ${TRENDS_WEIBO_COUNT:-50}
+      TRENDS_WEIBO_FETCH_TTL_MS: ${TRENDS_WEIBO_FETCH_TTL_MS:-300000}
+      TRENDS_YOUTUBE_API_KEY: ${TRENDS_YOUTUBE_API_KEY:-}
+      TRENDS_YOUTUBE_DERIVATIVE_USE_APPROVED: ${TRENDS_YOUTUBE_DERIVATIVE_USE_APPROVED:-false}
+      TRENDS_YOUTUBE_REGIONS: ${TRENDS_YOUTUBE_REGIONS:-US,GB}
+      TRENDS_YOUTUBE_LIMIT_PER_REGION: ${TRENDS_YOUTUBE_LIMIT_PER_REGION:-20}
+      TRENDS_YOUTUBE_FETCH_TTL_MS: ${TRENDS_YOUTUBE_FETCH_TTL_MS:-3600000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+    mem_limit: 768m
+    pids_limit: 128
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777,uid=1000,gid=1000
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging: *bounded-logging
+    stop_grace_period: 645s
+    networks: [internal]
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    environment:
+      PUBLIC_IP: ${PUBLIC_IP:?Set PUBLIC_IP in .env.production}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/certbot/www:/var/www/certbot:ro
+      - ./deploy/certbot/conf:/etc/letsencrypt:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--no-verbose", "http://127.0.0.1/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+    mem_limit: 128m
+    pids_limit: 64
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777
+      - /data:rw,nosuid,nodev,size=16m,mode=0755
+      - /config:rw,nosuid,nodev,size=8m,mode=0755
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    logging: *bounded-logging
+    networks: [internal]
+
+  certbot:
+    image: certbot/certbot:v5.4.0
+    profiles: [tools]
+    volumes:
+      - ./deploy/certbot/www:/var/www/certbot
+      - ./deploy/certbot/conf:/etc/letsencrypt
+    pids_limit: 64
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging: *bounded-logging
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  idea2screenplay_prod_pgdata:

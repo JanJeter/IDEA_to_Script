@@ -1,0 +1,264 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-07T17:11:01.927Z",
+  "title": "Design System: Idea2Screenplay",
+  "extensions": {
+    "colorMeta": {
+      "ink": {
+        "role": "primary",
+        "displayName": "铅字墨",
+        "canonical": "#211F1C",
+        "tonalRamp": ["#11100E", "#211F1C", "#34312D", "#4B4741", "#69645C", "#948D82", "#C8C1B7", "#F1EEE8"]
+      },
+      "ink-deep": {
+        "role": "primary",
+        "displayName": "深铅字",
+        "canonical": "#0F0E0D",
+        "tonalRamp": ["#090807", "#0F0E0D", "#242220", "#403D39", "#625E58", "#918B82", "#C7C1B8", "#F2EFEA"]
+      },
+      "text-soft": {
+        "role": "neutral",
+        "displayName": "批注灰",
+        "canonical": "#6F6B64",
+        "tonalRamp": ["#191815", "#2C2A27", "#47433E", "#6F6B64", "#8C877F", "#AEA9A1", "#D1CDC6", "#F1EFEB"]
+      },
+      "canvas": {
+        "role": "neutral",
+        "displayName": "未装订纸",
+        "canonical": "#F7F6F1",
+        "tonalRamp": ["#272620", "#47453D", "#69675E", "#8D8A80", "#B0ADA4", "#D1CEC6", "#E9E7E0", "#F7F6F1"]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "新纸白",
+        "canonical": "#FCFBF8",
+        "tonalRamp": ["#2B2A26", "#4D4B45", "#706E67", "#95928A", "#B9B6AF", "#DAD7D1", "#EFEEE9", "#FCFBF8"]
+      },
+      "surface-muted": {
+        "role": "neutral",
+        "displayName": "折页灰",
+        "canonical": "#ECE9E1",
+        "tonalRamp": ["#292722", "#48453F", "#67645C", "#89857C", "#ACA89F", "#CAC6BD", "#DFDCD4", "#ECE9E1"]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "装订线",
+        "canonical": "#D8D4CB",
+        "tonalRamp": ["#282620", "#46433D", "#625F57", "#817D74", "#A09C92", "#BDB9AF", "#D8D4CB", "#F0EEE9"]
+      },
+      "signal": {
+        "role": "secondary",
+        "displayName": "校订朱砂",
+        "canonical": "#B84A3A",
+        "tonalRamp": ["#3A1510", "#602119", "#8D3327", "#B84A3A", "#CF6B5C", "#E39386", "#F1BEB5", "#FBE9E5"]
+      },
+      "signal-deep": {
+        "role": "secondary",
+        "displayName": "深校订朱砂",
+        "canonical": "#91382D",
+        "tonalRamp": ["#32100D", "#551B16", "#762820", "#91382D", "#B95A4D", "#D78378", "#ECAFA7", "#F8E4E0"]
+      },
+      "success": {
+        "role": "tertiary",
+        "displayName": "完成绿",
+        "canonical": "#477D5D",
+        "tonalRamp": ["#10271B", "#1D432F", "#2E6045", "#477D5D", "#689A79", "#91B8A0", "#BED6C6", "#E8F2EB"]
+      },
+      "error": {
+        "role": "tertiary",
+        "displayName": "错误红",
+        "canonical": "#9D3429",
+        "tonalRamp": ["#35100D", "#591A15", "#7B2720", "#9D3429", "#C15549", "#D97E74", "#ECAAA3", "#F8E1DD"]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Editorial Display",
+        "purpose": "首页核心命题和极少量空状态短句。"
+      },
+      "headline": {
+        "displayName": "Story Headline",
+        "purpose": "项目名称、阶段标题和重要故事命题。"
+      },
+      "title": {
+        "displayName": "Interface Title",
+        "purpose": "面板、人物和场景标题。"
+      },
+      "body": {
+        "displayName": "Working Text",
+        "purpose": "说明、梗概、编辑内容和常规界面文字。"
+      },
+      "label": {
+        "displayName": "Production Label",
+        "purpose": "场次、时长、版本、阶段和短操作标签。"
+      }
+    },
+    "shadows": [
+      {
+        "name": "ambient-page",
+        "value": "0 18px 50px rgba(33, 31, 28, 0.10)",
+        "purpose": "完整剧本页面和真正离开画布的稿纸。"
+      },
+      {
+        "name": "ambient-overlay",
+        "value": "0 24px 80px rgba(15, 14, 13, 0.18)",
+        "purpose": "对话框、菜单和移动侧栏。"
+      },
+      {
+        "name": "focus-ring",
+        "value": "0 0 0 2px #F7F6F1, 0 0 0 4px #B84A3A",
+        "purpose": "在暖白或墨色表面上均清晰可见的键盘焦点。"
+      }
+    ],
+    "motion": [
+      {
+        "name": "state-standard",
+        "value": "180ms cubic-bezier(0.2, 0, 0, 1)",
+        "purpose": "悬停、焦点、选中和内容切换。"
+      },
+      {
+        "name": "state-emphasis",
+        "value": "220ms cubic-bezier(0.2, 0, 0, 1)",
+        "purpose": "对话框和移动抽屉的进入与退出。"
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "mobile",
+        "value": "760px"
+      },
+      {
+        "name": "compact",
+        "value": "1050px"
+      },
+      {
+        "name": "wide-content",
+        "value": "1280px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "每个视区唯一的主动作，适用于开始生成或确认继续。",
+      "html": "<button class=\"ds-btn-primary\" type=\"button\">确认并继续</button>",
+      "css": ".ds-btn-primary{height:44px;padding:12px 18px;border:0;border-radius:8px;background:#211F1C;color:#FCFBF8;font:500 11px/1.4 'IBM Plex Mono',monospace;letter-spacing:.08em;cursor:pointer;transition:background 180ms cubic-bezier(.2,0,0,1),transform 180ms cubic-bezier(.2,0,0,1)}.ds-btn-primary:hover{background:#0F0E0D}.ds-btn-primary:active{transform:translateY(1px)}.ds-btn-primary:focus-visible{outline:2px solid #B84A3A;outline-offset:2px}.ds-btn-primary:disabled{cursor:not-allowed;background:#D8D4CB;color:#6F6B64}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "编辑、局部重生成和其他不会推进流程的动作。",
+      "html": "<button class=\"ds-btn-secondary\" type=\"button\">局部重生成</button>",
+      "css": ".ds-btn-secondary{height:44px;padding:11px 17px;border:1px solid #D8D4CB;border-radius:8px;background:#FCFBF8;color:#211F1C;font:500 11px/1.4 'IBM Plex Mono',monospace;letter-spacing:.05em;cursor:pointer;transition:background 180ms cubic-bezier(.2,0,0,1),border-color 180ms cubic-bezier(.2,0,0,1)}.ds-btn-secondary:hover{background:#ECE9E1;border-color:#6F6B64}.ds-btn-secondary:focus-visible{outline:2px solid #B84A3A;outline-offset:2px}.ds-btn-secondary:disabled{cursor:not-allowed;color:#6F6B64;background:#F7F6F1}"
+    },
+    {
+      "name": "Story Prompt Composer",
+      "kind": "input",
+      "refersTo": "prompt-input",
+      "description": "首页唯一的核心输入，同时承载原创创意和故事素材入口。",
+      "html": "<div class=\"ds-composer\"><label for=\"ds-idea\">我想写一个</label><input id=\"ds-idea\" type=\"text\" value=\"失眠的地铁维修工收到七年前的求救广播\"/><button type=\"button\" aria-label=\"开始创作\">→</button></div>",
+      "css": ".ds-composer{display:grid;grid-template-columns:auto minmax(0,1fr) 42px;align-items:center;gap:12px;min-height:64px;padding:9px 10px 9px 20px;border:1px solid #D8D4CB;border-radius:14px;background:#FCFBF8;color:#211F1C;box-shadow:0 8px 28px rgba(33,31,28,.06)}.ds-composer:focus-within{border-color:#211F1C;box-shadow:0 0 0 2px #F7F6F1,0 0 0 4px #B84A3A}.ds-composer label{font:400 15px/1.4 Inter,sans-serif;color:#6F6B64}.ds-composer input{min-width:0;border:0;outline:0;background:transparent;color:#211F1C;font:400 16px/1.5 Inter,sans-serif}.ds-composer button{width:42px;height:42px;border:0;border-radius:8px;background:#211F1C;color:#FCFBF8;font-size:20px;cursor:pointer}.ds-composer button:hover{background:#0F0E0D}.ds-composer button:focus-visible{outline:2px solid #B84A3A;outline-offset:2px}"
+    },
+    {
+      "name": "Project Navigation Item",
+      "kind": "nav",
+      "refersTo": "nav-active",
+      "description": "侧栏中的故事项目，使用底色、字重和文字状态共同表达选择。",
+      "html": "<button class=\"ds-nav-item ds-nav-item-active\" type=\"button\"><span class=\"ds-nav-index\">02</span><span><strong>零点十七分</strong><small>悬疑科幻 · 初稿完成</small></span></button>",
+      "css": ".ds-nav-item{display:grid;grid-template-columns:26px minmax(0,1fr);gap:10px;width:100%;padding:10px 12px;border:0;border-radius:8px;background:transparent;color:#6F6B64;text-align:left;cursor:pointer;transition:background 180ms cubic-bezier(.2,0,0,1),color 180ms cubic-bezier(.2,0,0,1)}.ds-nav-item:hover{background:#ECE9E1;color:#211F1C}.ds-nav-item-active{background:#ECE9E1;color:#211F1C}.ds-nav-item:focus-visible{outline:2px solid #B84A3A;outline-offset:2px}.ds-nav-index{padding-top:2px;font:500 10px/1.4 'IBM Plex Mono',monospace}.ds-nav-item strong{display:block;overflow:hidden;font:600 14px/1.4 Inter,sans-serif;text-overflow:ellipsis;white-space:nowrap}.ds-nav-item small{display:block;margin-top:3px;color:#6F6B64;font:400 11px/1.4 Inter,sans-serif}"
+    },
+    {
+      "name": "Generation Stage",
+      "kind": "custom",
+      "refersTo": "surface-card",
+      "description": "带有序号、名称和文字状态的流水线步骤，不单独依赖颜色。",
+      "html": "<button class=\"ds-stage\" type=\"button\"><span class=\"ds-stage-mark\">03</span><span><strong>情节节拍</strong><small>等待确认</small></span></button>",
+      "css": ".ds-stage{display:grid;grid-template-columns:36px 1fr;gap:12px;align-items:center;width:220px;padding:14px;border:1px solid #B84A3A;border-radius:8px;background:#FCFBF8;color:#211F1C;text-align:left;cursor:pointer}.ds-stage:hover{background:#F7F6F1}.ds-stage:focus-visible{outline:2px solid #B84A3A;outline-offset:2px}.ds-stage-mark{display:grid;width:36px;height:36px;place-items:center;border-radius:999px;background:#B84A3A;color:#FCFBF8;font:500 10px/1 'IBM Plex Mono',monospace}.ds-stage strong{display:block;font:600 14px/1.35 Inter,sans-serif}.ds-stage small{display:block;margin-top:4px;color:#6F6B64;font:400 11px/1.4 Inter,sans-serif}"
+    },
+    {
+      "name": "Story Surface",
+      "kind": "card",
+      "refersTo": "surface-card",
+      "description": "人物、节拍和场景信息的默认容器，平面、细边框、无阴影。",
+      "html": "<article class=\"ds-story-surface\"><span>PREMISE / 故事前提</span><h3>她必须决定，救援是否会再次制造那场事故。</h3><p>生成结果是可编辑草稿，确认后才进入人物阶段。</p></article>",
+      "css": ".ds-story-surface{max-width:520px;padding:24px;border:1px solid #D8D4CB;border-radius:8px;background:#FCFBF8;color:#211F1C}.ds-story-surface span{display:block;margin-bottom:18px;color:#6F6B64;font:500 10px/1.4 'IBM Plex Mono',monospace;letter-spacing:.08em}.ds-story-surface h3{margin:0;font:500 24px/1.4 'Playfair Display','Noto Serif SC',serif}.ds-story-surface p{margin:16px 0 0;color:#6F6B64;font:400 14px/1.7 Inter,'Noto Sans SC',sans-serif}"
+    },
+    {
+      "name": "Screenplay Page",
+      "kind": "custom",
+      "refersTo": "surface-card",
+      "description": "唯一允许持续环境阴影的稿纸组件，强调可读性而不是仿旧质感。",
+      "html": "<article class=\"ds-script-page\"><header>SCENE 03 · 已保存</header><h3>内景．控制室—夜</h3><p>许岚停在闪烁的接收机前。七年前的呼号再次响起。</p><div class=\"ds-dialogue\"><strong>许岚</strong><p>你到底在等谁回答？</p></div></article>",
+      "css": ".ds-script-page{width:min(620px,calc(100% - 32px));min-height:520px;padding:34px 48px;border:1px solid #E6E2DA;border-radius:4px;background:#FCFBF8;color:#211F1C;box-shadow:0 18px 50px rgba(33,31,28,.10);font:400 14px/1.75 'Courier New',monospace}.ds-script-page header{margin:-34px -48px 34px;padding:12px 18px;border-bottom:1px solid #D8D4CB;background:#ECE9E1;color:#6F6B64;font:500 10px/1.4 'IBM Plex Mono',monospace;letter-spacing:.06em}.ds-script-page h3{margin:0 0 24px;font:600 14px/1.5 'Courier New',monospace;text-transform:uppercase}.ds-dialogue{width:70%;margin:32px auto}.ds-dialogue strong{display:block;text-align:center}.ds-dialogue p{margin:6px 0}.ds-script-page:focus-within{outline:2px solid #B84A3A;outline-offset:3px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "未装订的剧本",
+    "overview": "这套系统像一份刚从编剧手中拿到、仍可继续修改的剧本：暖白、安静、可信，保留纸张与铅字的文化联想，但不模拟陈旧材质。首页借鉴 Sitor 的编辑出版感，用充足留白把一句话创意放在视觉中心；用户进入工作台后，留白收紧，人物、节拍、场景和对白获得更高的信息密度。\n\n界面必须“作品重于工具”。生成过程通过真实阶段、明确状态和可编辑产物建立可信度，不通过霓虹、机器人形象或虚假的思考动画表演 AI。操作控件使用熟悉的产品模式，电影语言只出现在场次编号、剧本排版和少量符号中。\n\n桌面工作台以 1280px 内容宽度为上限，侧栏在 1050px 以下收窄，在 760px 以下折叠为抽屉。普通状态变化使用 150–220ms 的克制过渡；禁用装饰性入场编排，并完整尊重 prefers-reduced-motion。",
+    "keyCharacteristics": [
+      "暖白画布与铅字墨形成主要视觉关系。",
+      "校订朱砂只标记关键动作、当前阶段和需要注意的状态。",
+      "首页疏朗，工作台紧凑；两者共享同一字体、颜色和组件词汇。",
+      "内容区以细线和色调分层，阴影只属于真正悬浮的纸张与浮层。",
+      "所有核心路径满足 WCAG 2.2 AA，并支持完整键盘操作。"
+    ],
+    "rules": [
+      {
+        "name": "The One Red Mark Rule",
+        "body": "校订朱砂在任一屏幕上的可见面积不得超过 8%；如果同时有三个以上朱砂强调点，必须降低其中至少两个的权重。",
+        "section": "colors"
+      },
+      {
+        "name": "The Warm White Rule",
+        "body": "禁止用纯白覆盖整个页面；未装订纸负责环境，新纸白只负责需要聚焦的内容表面。",
+        "section": "colors"
+      },
+      {
+        "name": "The Semantic State Rule",
+        "body": "成功、错误和进行中状态必须同时拥有文字或图标，禁止只依赖颜色传达。",
+        "section": "colors"
+      },
+      {
+        "name": "The Two-Voice Rule",
+        "body": "一个界面区域最多同时出现衬线与无衬线两种声音；等宽标签属于元数据，不得扩张为第三种正文风格。",
+        "section": "typography"
+      },
+      {
+        "name": "The Italic Accent Rule",
+        "body": "斜体只属于首页或空状态中的短句，禁止用于按钮、输入内容、导航和长篇中文文本。",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-by-Default Rule",
+        "body": "如果一个容器不会遮挡或离开相邻内容，它就没有资格获得阴影。",
+        "section": "elevation"
+      },
+      {
+        "name": "The No Hard Shadow Rule",
+        "body": "禁止使用当前版本中 5px–16px 的硬偏移块状阴影；若阴影边缘一眼可见，说明强度过高。",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do 让首页的创意输入成为唯一主视觉，并在首屏直接提供完整示例入口。",
+      "Do 使用 canvas、surface 和 surface-muted 建立层级，把 signal 控制在每屏 8% 以内。",
+      "Do 在工作台中优先展示用户作品、真实生成阶段和可编辑产物。",
+      "Do 为按钮、输入、导航和阶段控件实现默认、悬停、焦点、按下、禁用、加载与错误状态。",
+      "Do 保持首页疏朗、工作台紧凑，并在 760px 与 1050px 处进行结构性响应式调整。",
+      "Do 为进度、成功和错误状态同时提供文字、图标与颜色，并满足 WCAG 2.2 AA。"
+    ],
+    "donts": [
+      "Don't 使用“紫蓝渐变、霓虹发光、机器人插画等通用 AI 产品外观”。",
+      "Don't 使用“厚重的全暗色界面、强烈仿旧纸张纹理或大面积暗红装饰”。",
+      "Don't 把复杂创作流程退化成单一聊天窗口。",
+      "Don't 使用“满屏同质卡片、无意义的大标题和装饰性动画”营造高级感。",
+      "Don't 采用“廉价短视频模板、娱乐化贴纸或过度活跃的社交平台视觉语言”。",
+      "Don't 在普通卡片上添加硬阴影、悬停位移或玻璃拟态；如果容器看起来像漂浮广告，它已经偏离系统。",
+      "Don't 在按钮、导航、表单标签或长篇正文中使用装饰性斜体衬线字体。",
+      "Don't 只用颜色、动画或透明度表达状态，也不得忽略键盘焦点和减少动态设置。"
+    ]
+  }
+}

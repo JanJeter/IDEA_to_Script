@@ -1,0 +1,42 @@
+{
+	auto_https off
+}
+
+:80 {
+	encode zstd gzip
+
+	handle /.well-known/acme-challenge/* {
+		root * /var/www/certbot
+		file_server
+	}
+
+	@api path /api/*
+	handle @api {
+		reverse_proxy api:3000 {
+			flush_interval -1
+		}
+	}
+
+	respond /healthz 200
+
+	@assets path /assets/*
+	handle @assets {
+		root * /srv
+		file_server
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		-Server
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		Content-Security-Policy "default-src 'self'; connect-src 'self' http: https:; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		X-Frame-Options DENY
+	}
+	header /index.html Cache-Control "no-cache, no-store, must-revalidate"
+}

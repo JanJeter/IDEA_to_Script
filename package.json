@@ -1,0 +1,28 @@
+{
+  "name": "idea2screenplay",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c yellow,cyan \"npm run dev -w @idea2screenplay/api\" \"npm run dev -w @idea2screenplay/web\"",
+    "dev:api": "npm run dev -w @idea2screenplay/api",
+    "dev:web": "npm run dev -w @idea2screenplay/web",
+    "build": "npm run build -w @idea2screenplay/api && npm run build -w @idea2screenplay/web",
+    "test": "npm run test -w @idea2screenplay/api && npm run test -w @idea2screenplay/web",
+    "lint": "npm run lint -w @idea2screenplay/api && npm run lint -w @idea2screenplay/web",
+    "access-codes:generate": "node scripts/generate-access-codes.mjs",
+    "db:generate": "npm run prisma:generate -w @idea2screenplay/api",
+    "db:migrate": "node --env-file=.env node_modules/prisma/build/index.js migrate deploy --schema=apps/api/prisma/schema.prisma",
+    "db:migrate:dev": "node --env-file=.env node_modules/prisma/build/index.js migrate dev --schema=apps/api/prisma/schema.prisma",
+    "db:deploy": "node --env-file=.env node_modules/prisma/build/index.js migrate deploy --schema=apps/api/prisma/schema.prisma",
+    "db:studio": "node --env-file=.env node_modules/prisma/build/index.js studio --schema=apps/api/prisma/schema.prisma"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  },
+  "engines": {
+    "node": ">=22.12"
+  }
+}

@@ -1,0 +1,394 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProjectStatus {
+  DRAFT
+  GENERATING
+  REVIEWING
+  READY
+  FAILED
+}
+
+enum RunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum GenerationVersionStatus {
+  STAGING
+  ACTIVE
+  SUPERSEDED
+  FAILED
+}
+
+enum GenerationJobStatus {
+  QUEUED
+  RUNNING
+  RETRYING
+  SUCCEEDED
+  FAILED
+}
+
+enum ProjectMode {
+  ORIGINAL
+  ADAPTATION
+  TREND_INSPIRED
+}
+
+enum TrendRiskLevel {
+  LOW
+  REVIEW
+  BLOCKED
+}
+
+enum TrendPolicyAction {
+  AUTO_APPROVE
+  REVIEW
+  BLOCK
+}
+
+model Project {
+  id                String                  @id @default(uuid())
+  visitorId         String
+  activeVersionId   String?                 @unique
+  trendTopicId      String?
+  mode              ProjectMode             @default(ORIGINAL)
+  title             String
+  logline           String                  @db.Text
+  sourceText        String?                 @db.Text
+  genre             String
+  tone              String
+  language          String                  @default("zh-CN")
+  targetMinutes     Int                     @default(8)
+  premise           String?                 @db.Text
+  synopsis          String?                 @db.Text
+  theme             String?                 @db.Text
+  scriptText        String?                 @db.Text
+  status            ProjectStatus           @default(DRAFT)
+  currentStage      String                  @default("IDEA")
+  regenerationsUsed Int                     @default(0)
+  expiresAt         DateTime
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  characters        Character[]
+  relationships     CharacterRelationship[]
+  locations         Location[]
+  beats             Beat[]
+  scenes            Scene[]
+  runs              GenerationRun[]
+  jobs              GenerationJob[]
+  versions          GenerationVersion[]     @relation("ProjectVersions")
+  activeVersion     GenerationVersion?      @relation("ActiveProjectVersion", fields: [activeVersionId], references: [id], onDelete: SetNull)
+  visitor           AnonymousVisitor        @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+  trendTopic        TrendTopic?             @relation(fields: [trendTopicId], references: [id], onDelete: SetNull)
+
+  @@index([visitorId, updatedAt])
+  @@index([visitorId, expiresAt])
+  @@index([trendTopicId])
+  @@index([expiresAt])
+}
+
+model TrendTopic {
+  id            String             @id @default(uuid())
+  source        String
+  externalId    String
+  title         String
+  excerpt       String             @db.VarChar(500)
+  sourceLabel   String
+  sourceUrl     String             @db.Text
+  license       String
+  category      String
+  rank          Int?
+  views         Int?
+  heatScore     Float              @default(0)
+  momentumScore Float              @default(0)
+  riskLevel     TrendRiskLevel     @default(LOW)
+  policyAction  TrendPolicyAction  @default(AUTO_APPROVE)
+  riskReasons   Json
+  publishedAt   DateTime?
+  firstSeenAt   DateTime           @default(now())
+  lastSeenAt    DateTime
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  observations  TrendObservation[]
+  projects      Project[]
+
+  @@unique([source, externalId])
+  @@index([riskLevel, heatScore])
+  @@index([lastSeenAt])
+}
+
+model TrendObservation {
+  id            String     @id @default(uuid())
+  trendTopicId  String
+  rank          Int?
+  views         Int?
+  heatScore     Float
+  momentumScore Float
+  observedAt    DateTime   @default(now())
+  trendTopic    TrendTopic @relation(fields: [trendTopicId], references: [id], onDelete: Cascade)
+
+  @@unique([trendTopicId, observedAt])
+  @@index([observedAt])
+}
+
+model AnonymousVisitor {
+  id          String              @id @default(uuid())
+  tokenHash   String              @unique
+  createdAt   DateTime            @default(now())
+  lastSeenAt  DateTime            @default(now())
+  projects    Project[]
+  dailyQuotas DailyVisitorQuota[]
+}
+
+model DailyVisitorQuota {
+  visitorId       String
+  day             String           @db.VarChar(10)
+  realGenerations Int              @default(0)
+  updatedAt       DateTime         @updatedAt
+  visitor         AnonymousVisitor @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+
+  @@id([visitorId, day])
+}
+
+model DailyIpQuota {
+  ipHash          String   @db.VarChar(64)
+  day             String   @db.VarChar(10)
+  projectsCreated Int      @default(0)
+  realGenerations Int      @default(0)
+  updatedAt       DateTime @updatedAt
+
+  @@id([ipHash, day])
+}
+
+model GlobalDailyGenerationQuota {
+  day       String   @id @db.VarChar(10)
+  used      Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+model GlobalMonthlyGenerationQuota {
+  month     String   @id @db.VarChar(7)
+  used      Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+model Character {
+  id                    String                  @id @default(uuid())
+  projectId             String
+  name                  String
+  role                  String
+  age                   String?
+  description           String                  @db.Text
+  goal                  String                  @db.Text
+  conflict              String                  @db.Text
+  arc                   String                  @db.Text
+  voice                 String                  @db.Text
+  sortOrder             Int                     @default(0)
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  project               Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  outgoingRelationships CharacterRelationship[] @relation("RelationshipSource")
+  incomingRelationships CharacterRelationship[] @relation("RelationshipTarget")
+
+  @@unique([projectId, id])
+  @@index([projectId, sortOrder])
+}
+
+model CharacterRelationship {
+  id          String    @id @default(uuid())
+  projectId   String
+  sourceId    String
+  targetId    String
+  type        String
+  description String    @db.Text
+  strength    Int       @default(1)
+  directed    Boolean   @default(false)
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  source      Character @relation("RelationshipSource", fields: [projectId, sourceId], references: [projectId, id], onDelete: Cascade)
+  target      Character @relation("RelationshipTarget", fields: [projectId, targetId], references: [projectId, id], onDelete: Cascade)
+
+  @@index([projectId, sortOrder])
+  @@index([sourceId])
+  @@index([targetId])
+}
+
+model Location {
+  id                String   @id @default(uuid())
+  projectId         String
+  name              String
+  description       String   @db.Text
+  atmosphere        String   @db.Text
+  recurringElements String   @db.Text
+  sortOrder         Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  project           Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, sortOrder])
+}
+
+model Beat {
+  id             String   @id @default(uuid())
+  projectId      String
+  act            Int
+  sequence       Int
+  title          String
+  summary        String   @db.Text
+  emotionalShift String   @db.Text
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  scenes         Scene[]
+
+  @@unique([projectId, sequence])
+  @@index([projectId, act, sequence])
+}
+
+model Scene {
+  id               String   @id @default(uuid())
+  projectId        String
+  beatId           String?
+  sceneNumber      Int
+  heading          String
+  location         String
+  timeOfDay        String
+  summary          String   @db.Text
+  action           String   @db.Text
+  dialogue         Json
+  estimatedSeconds Int      @default(60)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  beat             Beat?    @relation(fields: [beatId], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, sceneNumber])
+  @@index([projectId, sceneNumber])
+}
+
+model GenerationRun {
+  id                 String                   @id @default(uuid())
+  projectId          String
+  versionId          String?
+  stage              String
+  status             RunStatus                @default(RUNNING)
+  model              String
+  providerCallCount  Int                      @default(0)
+  providerDurationMs Int?
+  promptTokens       Int?
+  completionTokens   Int?
+  error              String?                  @db.Text
+  startedAt          DateTime                 @default(now())
+  completedAt        DateTime?
+  project            Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  version            GenerationVersion?       @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  providerCalls      GenerationProviderCall[]
+
+  @@index([projectId, startedAt])
+  @@index([versionId, startedAt])
+}
+
+model GenerationProviderCall {
+  id               String        @id @default(uuid())
+  runId            String
+  sequence         Int
+  structured       Boolean
+  outcome          String        @db.VarChar(40)
+  retryable        Boolean
+  httpStatus       Int?
+  promptTokens     Int?
+  completionTokens Int?
+  durationMs       Int
+  createdAt        DateTime      @default(now())
+  run              GenerationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, sequence])
+  @@index([runId, createdAt])
+}
+
+model GenerationVersion {
+  id             String                  @id @default(uuid())
+  projectId      String
+  jobId          String?
+  status         GenerationVersionStatus @default(STAGING)
+  title          String?
+  premise        String?                 @db.Text
+  synopsis       String?                 @db.Text
+  theme          String?                 @db.Text
+  characters     Json?
+  relationships  Json?
+  locations      Json?
+  beats          Json?
+  scenePlans     Json?
+  writtenScenes  Json?
+  scriptText     String?                 @db.Text
+  currentStage   String                  @default("IDEA")
+  confirmedStage String?
+  error          String?                 @db.Text
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  completedAt    DateTime?
+  project        Project                 @relation("ProjectVersions", fields: [projectId], references: [id], onDelete: Cascade)
+  job            GenerationJob?          @relation("JobVersions", fields: [jobId], references: [id], onDelete: SetNull)
+  activeFor      Project?                @relation("ActiveProjectVersion")
+  resultFor      GenerationJob?          @relation("JobResultVersion")
+  targetJobs     GenerationJob[]         @relation("JobTargetVersion")
+  runs           GenerationRun[]
+
+  @@index([projectId, createdAt])
+  @@index([projectId, status])
+  @@index([jobId, createdAt])
+}
+
+model GenerationJob {
+  id               String               @id @default(uuid())
+  projectId        String
+  versionId        String?
+  stage            String               @default("PREMISE")
+  status           GenerationJobStatus  @default(QUEUED)
+  progress         Int                  @default(0)
+  currentStage     String?
+  message          String               @default("任务等待中") @db.Text
+  safeErrorMessage String?              @db.Text
+  attempt          Int                  @default(0)
+  eventSequence    Int                  @default(0)
+  resultVersionId  String?              @unique
+  queuedAt         DateTime             @default(now())
+  startedAt        DateTime?
+  completedAt      DateTime?
+  updatedAt        DateTime             @updatedAt
+  project          Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  version          GenerationVersion?   @relation("JobTargetVersion", fields: [versionId], references: [id], onDelete: SetNull)
+  resultVersion    GenerationVersion?   @relation("JobResultVersion", fields: [resultVersionId], references: [id], onDelete: SetNull)
+  versions         GenerationVersion[]  @relation("JobVersions")
+  events           GenerationJobEvent[]
+
+  @@index([projectId, queuedAt])
+  @@index([versionId, queuedAt])
+  @@index([status, queuedAt])
+}
+
+model GenerationJobEvent {
+  id        String        @id @default(uuid())
+  jobId     String
+  sequence  Int
+  type      String
+  stage     String?
+  message   String        @db.Text
+  progress  Int
+  createdAt DateTime      @default(now())
+  job       GenerationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, sequence])
+  @@index([jobId, createdAt])
+}

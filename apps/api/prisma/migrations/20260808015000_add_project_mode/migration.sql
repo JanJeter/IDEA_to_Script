@@ -1,0 +1,5 @@
+CREATE TYPE "ProjectMode" AS ENUM ('ORIGINAL', 'ADAPTATION');
+
+ALTER TABLE "Project"
+ADD COLUMN "mode" "ProjectMode" NOT NULL DEFAULT 'ORIGINAL',
+ADD COLUMN "sourceText" TEXT;

@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+coverage/
+test-results/
+*.log
+.DS_Store
+.idea/
+.vscode/
+apps/api/prisma/dev.db*
+deploy/certbot/

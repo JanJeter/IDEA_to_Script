@@ -1,0 +1,56 @@
+{
+	auto_https off
+}
+
+http://{$PUBLIC_IP} {
+	route {
+		handle /.well-known/acme-challenge/* {
+			root * /var/www/certbot
+			file_server
+		}
+
+		redir https://{$PUBLIC_IP}{uri} permanent
+	}
+}
+
+https://{$PUBLIC_IP} {
+	tls /etc/letsencrypt/live/{$PUBLIC_IP}/fullchain.pem /etc/letsencrypt/live/{$PUBLIC_IP}/privkey.pem
+	encode zstd gzip
+
+	@api path /api/*
+	handle @api {
+		reverse_proxy api:3000 {
+			flush_interval -1
+			transport http {
+				read_timeout 120s
+			}
+		}
+	}
+
+	respond /healthz 200
+
+	@assets path /assets/*
+	handle @assets {
+		root * /srv
+		file_server
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		-Server
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		Content-Security-Policy "default-src 'self'; connect-src 'self' https:; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		X-Frame-Options DENY
+	}
+	header /index.html Cache-Control "no-cache, no-store, must-revalidate"
+
+	@assets path /assets/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+}
