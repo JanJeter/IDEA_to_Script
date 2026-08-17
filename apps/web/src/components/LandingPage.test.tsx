@@ -1,11 +1,42 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import type { ComponentProps } from 'react';
 import '@testing-library/jest-dom/vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { CreateProjectInput } from '../types';
 import { LandingPage } from './LandingPage';
 
 const landingCss = readFileSync(resolve('src/components/LandingPage.css'), 'utf8');
+
+function renderLanding(overrides: Partial<ComponentProps<typeof LandingPage>> = {}) {
+  const onCreate = vi.fn(async (input: CreateProjectInput) => {
+    void input;
+  });
+  const onOpenSample = vi.fn();
+  const onOpenTrends = vi.fn();
+  const props: ComponentProps<typeof LandingPage> = {
+    onCreate,
+    onOpenSample,
+    onOpenTrends,
+    ...overrides,
+  };
+
+  return { ...render(<LandingPage {...props} />), onCreate, onOpenSample, onOpenTrends };
+}
+
+function enterOriginalSeed() {
+  fireEvent.change(screen.getByLabelText('一句话故事创意'), {
+    target: { value: '一个失眠的维修工收到来自七年前的广播。' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: '继续填写项目设置' }));
+}
+
+function fillProjectSetup() {
+  fireEvent.change(screen.getByLabelText('项目名称'), { target: { value: '零点十七分' } });
+  fireEvent.change(screen.getByLabelText('类型'), { target: { value: '现实悬疑' } });
+  fireEvent.change(screen.getByLabelText('气质与语调'), { target: { value: '克制、紧张' } });
+}
 
 afterEach(() => {
   cleanup();
@@ -13,95 +44,166 @@ afterEach(() => {
 });
 
 describe('LandingPage', () => {
-  it('opens the complete sample without requiring the API', () => {
-    const onOpenSample = vi.fn();
-    render(<LandingPage onStart={vi.fn()} onOpenSample={onOpenSample} onOpenTrends={vi.fn()} />);
+  it('opens the complete sample without requiring project creation', () => {
+    const { onOpenSample, onCreate } = renderLanding();
 
     fireEvent.click(screen.getByRole('button', { name: '先查看一份完成的剧本' }));
     expect(onOpenSample).toHaveBeenCalledOnce();
+    expect(onCreate).not.toHaveBeenCalled();
   });
 
-  it('validates and submits an original story seed', () => {
-    const onStart = vi.fn();
-    render(<LandingPage onStart={onStart} onOpenSample={vi.fn()} onOpenTrends={vi.fn()} />);
+  it('expands project settings in place and focuses the project title', async () => {
+    const { onCreate } = renderLanding();
+    const continueButton = screen.getByRole('button', { name: '继续填写项目设置' });
+    expect(continueButton).toHaveAttribute('aria-expanded', 'false');
 
-    fireEvent.change(screen.getByLabelText('一句话故事创意'), {
-      target: { value: '一个失眠的维修工收到来自七年前的广播。' },
+    enterOriginalSeed();
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '补充项目设置' })).toBeInTheDocument();
+    expect(continueButton).toHaveAttribute('aria-expanded', 'true');
+    await waitFor(() => expect(screen.getByLabelText('项目名称')).toHaveFocus());
+    expect(onCreate).not.toHaveBeenCalled();
+  });
+
+  it('submits a complete original project through the shared form handler', async () => {
+    const { onCreate } = renderLanding();
+    enterOriginalSeed();
+    fillProjectSetup();
+
+    fireEvent.submit(screen.getByRole('heading', { name: '补充项目设置' }).closest('form')!);
+
+    await waitFor(() => expect(onCreate).toHaveBeenCalledOnce());
+    expect(onCreate).toHaveBeenCalledWith({
+      mode: 'ORIGINAL',
+      title: '零点十七分',
+      logline: '一个失眠的维修工收到来自七年前的广播。',
+      sourceText: undefined,
+      genre: '现实悬疑',
+      tone: '克制、紧张',
+      targetMinutes: 8,
+      language: 'zh-CN',
     });
-    fireEvent.click(screen.getByRole('button', { name: '继续设置创作项目' }));
-
-    expect(onStart).toHaveBeenCalledWith('一个失眠的维修工收到来自七年前的广播。', 'original');
   });
 
   it('focuses the story field when the original seed is too short', () => {
-    const onStart = vi.fn();
-    render(<LandingPage onStart={onStart} onOpenSample={vi.fn()} onOpenTrends={vi.fn()} />);
-
+    const { onCreate } = renderLanding();
     const input = screen.getByLabelText('一句话故事创意');
+
     fireEvent.change(input, { target: { value: '太短了' } });
-    fireEvent.click(screen.getByRole('button', { name: '继续设置创作项目' }));
+    fireEvent.click(screen.getByRole('button', { name: '继续填写项目设置' }));
 
     expect(screen.getByRole('alert')).toHaveTextContent('请至少写下 10 个字');
     expect(input).toHaveAttribute('aria-invalid', 'true');
     expect(input).toHaveFocus();
-    expect(onStart).not.toHaveBeenCalled();
+    expect(onCreate).not.toHaveBeenCalled();
   });
 
-  it('requires enough adaptation material and a rights confirmation', () => {
-    const onStart = vi.fn();
-    render(<LandingPage onStart={onStart} onOpenSample={vi.fn()} onOpenTrends={vi.fn()} />);
+  it('focuses and describes the first missing project field', async () => {
+    const { onCreate } = renderLanding();
+    enterOriginalSeed();
 
-    const adaptationMode = screen.getByRole('radio', { name: '网文改编' });
-    fireEvent.click(adaptationMode);
-    expect(adaptationMode).toBeChecked();
+    fireEvent.click(screen.getByRole('button', { name: '创建故事档案' }));
+
+    const title = screen.getByLabelText('项目名称');
+    expect(await screen.findByRole('alert')).toHaveTextContent('请给故事起一个项目名称');
+    expect(title).toHaveAttribute('aria-invalid', 'true');
+    expect(title).toHaveAttribute('aria-describedby', 'project-setup-error');
+    expect(title).toHaveFocus();
+    expect(onCreate).not.toHaveBeenCalled();
+  });
+
+  it('requires adaptation material rights and includes the source in its payload', async () => {
+    const { onCreate } = renderLanding();
+    fireEvent.click(screen.getByRole('radio', { name: '网文改编' }));
 
     const input = screen.getByLabelText('网文改编素材');
-    expect(input).toHaveAttribute('maxlength', '10000');
     fireEvent.change(input, { target: { value: '素材'.repeat(20) } });
-    fireEvent.click(screen.getByRole('button', { name: '继续设置创作项目' }));
+    fireEvent.click(screen.getByRole('button', { name: '继续填写项目设置' }));
     expect(screen.getByRole('alert')).toHaveTextContent('至少 200 个字');
-    expect(input).toHaveFocus();
 
-    fireEvent.change(input, { target: { value: '素材'.repeat(100) } });
-    fireEvent.click(screen.getByRole('button', { name: '继续设置创作项目' }));
+    const source = '素材'.repeat(100);
+    fireEvent.change(input, { target: { value: source } });
+    fireEvent.click(screen.getByRole('button', { name: '继续填写项目设置' }));
 
     const rights = screen.getByRole('checkbox', { name: /我拥有该素材的使用权/ });
     expect(screen.getByRole('alert')).toHaveTextContent('请先确认你拥有该素材的使用权');
-    expect(rights).toHaveAttribute('aria-invalid', 'true');
     expect(rights).toHaveFocus();
-    expect(input).not.toHaveAttribute('aria-invalid', 'true');
 
     fireEvent.click(rights);
-    fireEvent.click(screen.getByRole('button', { name: '继续设置创作项目' }));
-    expect(onStart).toHaveBeenCalledWith('素材'.repeat(100), 'adaptation');
+    fireEvent.click(screen.getByRole('button', { name: '继续填写项目设置' }));
+    fillProjectSetup();
+    fireEvent.click(screen.getByRole('button', { name: '创建故事档案' }));
+
+    await waitFor(() => expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({
+      mode: 'ADAPTATION',
+      logline: source,
+      sourceText: source,
+    })));
   });
 
-  it('opens the public trend desk from the primary navigation', () => {
-    const onOpenTrends = vi.fn();
-    render(<LandingPage onStart={vi.fn()} onOpenSample={vi.fn()} onOpenTrends={onOpenTrends} />);
+  it('preserves the draft when returning to edit the seed', async () => {
+    renderLanding();
+    enterOriginalSeed();
+    fireEvent.change(screen.getByLabelText('项目名称'), { target: { value: '临时片名' } });
 
+    fireEvent.click(screen.getByRole('button', { name: '返回修改创意' }));
+
+    const seed = screen.getByLabelText('一句话故事创意');
+    expect(screen.queryByRole('heading', { name: '补充项目设置' })).not.toBeInTheDocument();
+    expect(seed).toHaveValue('一个失眠的维修工收到来自七年前的广播。');
+    await waitFor(() => expect(seed).toHaveFocus());
+
+    fireEvent.click(screen.getByRole('button', { name: '继续填写项目设置' }));
+    expect(screen.getByLabelText('项目名称')).toHaveValue('临时片名');
+  });
+
+  it('keeps setup values visible when project creation fails', async () => {
+    const onCreate = vi.fn(async () => {
+      throw new Error('服务暂时不可用');
+    });
+    renderLanding({ onCreate });
+    enterOriginalSeed();
+    fillProjectSetup();
+
+    fireEvent.click(screen.getByRole('button', { name: '创建故事档案' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('服务暂时不可用');
+    expect(screen.getByLabelText('项目名称')).toHaveValue('零点十七分');
+  });
+
+  it('exposes the busy state and prevents another submission', () => {
+    const { onCreate } = renderLanding({ busy: true });
+    const form = screen.getByLabelText('一句话故事创意').closest('form')!;
+
+    expect(form).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByRole('button', { name: '继续填写项目设置' })).toBeDisabled();
+    fireEvent.submit(form);
+    expect(onCreate).not.toHaveBeenCalled();
+  });
+
+  it('keeps the public trend and sample actions explicit', () => {
+    const { onOpenTrends } = renderLanding();
     fireEvent.click(screen.getByRole('button', { name: '热点选题' }));
     expect(onOpenTrends).toHaveBeenCalledOnce();
-  });
-
-  it('uses an explicit sample action and has no inactive footer buttons', () => {
-    render(<LandingPage onStart={vi.fn()} onOpenSample={vi.fn()} onOpenTrends={vi.fn()} />);
 
     const sample = screen.getByRole('article', { name: '《零点十七分》完整示例预览' });
     expect(within(sample).getByRole('button', { name: '打开完整示例' })).toBeInTheDocument();
     expect(within(screen.getByRole('contentinfo')).queryByRole('button')).not.toBeInTheDocument();
   });
 
-  it('keeps scroll-reveal content available when IntersectionObserver is unavailable', () => {
+  it('keeps every process stage visible when IntersectionObserver is unavailable', () => {
     vi.stubGlobal('IntersectionObserver', undefined);
-    render(<LandingPage onStart={vi.fn()} onOpenSample={vi.fn()} onOpenTrends={vi.fn()} />);
+    renderLanding();
 
-    const heading = screen.getByRole('heading', { name: '先看一份真正完成的初稿。' });
+    const heading = screen.getByRole('heading', { name: '先把故事说清楚' });
+    const stage = heading.closest('.process-step');
     expect(heading).toBeVisible();
-    expect(heading.closest('.scroll-reveal')).not.toHaveAttribute('data-revealed');
+    expect(stage).not.toHaveAttribute('data-active');
+    expect(screen.getAllByRole('article').filter((element) => element.classList.contains('process-step'))).toHaveLength(6);
   });
 
-  it('reveals an observed section once and disconnects its observer', async () => {
+  it('activates a process stage once and disconnects its observer', async () => {
     const observers: Array<{
       callback: IntersectionObserverCallback;
       options: IntersectionObserverInit | undefined;
@@ -117,107 +219,49 @@ describe('LandingPage', () => {
       readonly disconnect = vi.fn();
       readonly unobserve = vi.fn();
 
-      constructor(nextCallback: IntersectionObserverCallback, options?: IntersectionObserverInit) {
+      constructor(callback: IntersectionObserverCallback, options?: IntersectionObserverInit) {
         this.rootMargin = options?.rootMargin ?? '0px';
         const threshold = options?.threshold ?? 0;
         this.thresholds = Array.isArray(threshold) ? threshold : [threshold];
-        observers.push({
-          callback: nextCallback,
-          options,
-          observe: this.observe,
-          disconnect: this.disconnect,
-        });
+        observers.push({ callback, options, observe: this.observe, disconnect: this.disconnect });
       }
 
       takeRecords = () => [];
     }
 
     vi.stubGlobal('IntersectionObserver', MockIntersectionObserver);
-    render(<LandingPage onStart={vi.fn()} onOpenSample={vi.fn()} onOpenTrends={vi.fn()} />);
+    renderLanding();
 
-    const heading = screen.getByRole('heading', { name: '先看一份真正完成的初稿。' });
-    const reveal = heading.closest('.scroll-reveal');
-    const observer = observers.find(({ observe }) => (
-      observe.mock.calls.some(([target]) => target === reveal)
-    ));
-
-    expect(reveal).not.toHaveAttribute('data-revealed');
-    expect(observer).toBeDefined();
-    expect(observer?.observe).toHaveBeenCalledWith(reveal);
-    expect(observer?.options).toEqual({ rootMargin: '0px 0px -8% 0px', threshold: 0.15 });
+    const stage = screen.getByRole('heading', { name: '先把故事说清楚' }).closest('.process-step')!;
+    const observer = observers.find(({ observe }) => observe.mock.calls.some(([target]) => target === stage));
+    expect(observer?.options).toEqual({ rootMargin: '0px 0px -16% 0px', threshold: 0.34 });
+    expect(stage).not.toHaveAttribute('data-active');
 
     act(() => observer?.callback(
       [{ isIntersecting: false } as IntersectionObserverEntry],
       {} as IntersectionObserver,
     ));
-    expect(reveal).not.toHaveAttribute('data-revealed');
     expect(observer?.disconnect).not.toHaveBeenCalled();
 
     act(() => observer?.callback(
       [{ isIntersecting: true } as IntersectionObserverEntry],
       {} as IntersectionObserver,
     ));
-    await waitFor(() => expect(reveal).toHaveAttribute('data-revealed', 'true'));
+    await waitFor(() => expect(stage).toHaveAttribute('data-active', 'true'));
     expect(observer?.disconnect).toHaveBeenCalledOnce();
-
-    act(() => observer?.callback(
-      [{ isIntersecting: false } as IntersectionObserverEntry],
-      {} as IntersectionObserver,
-    ));
-    expect(reveal).toHaveAttribute('data-revealed', 'true');
   });
 
-  it('still observes sections when reduced motion is requested so CSS can crossfade them', () => {
-    const matchMedia = vi.fn().mockReturnValue({
-      matches: true,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    });
-    const observerConstructor = vi.fn();
-    const observe = vi.fn();
+  it('keeps the typography and motion contract in CSS', () => {
+    const artifactBaseRule = landingCss.match(/\.process-step-artifact\s*\{([^}]*)\}/)?.[1] ?? '';
 
-    class MockIntersectionObserver {
-      readonly observe = observe;
-      readonly disconnect = vi.fn();
-
-      constructor() {
-        observerConstructor();
-      }
-    }
-
-    vi.stubGlobal('matchMedia', matchMedia);
-    vi.stubGlobal('IntersectionObserver', MockIntersectionObserver);
-
-    render(<LandingPage onStart={vi.fn()} onOpenSample={vi.fn()} onOpenTrends={vi.fn()} />);
-    const heading = screen.getByRole('heading', { name: '先看一份真正完成的初稿。' });
-    const reveal = heading.closest('.scroll-reveal');
-    expect(observerConstructor).toHaveBeenCalled();
-    expect(observe).toHaveBeenCalledWith(reveal);
-    expect(heading).toBeVisible();
-    expect(reveal).not.toHaveAttribute('data-revealed');
-  });
-
-  it('keeps the quiet reveal motion contract in CSS', () => {
-    const baseRule = landingCss.match(/\.scroll-reveal\s*\{([^}]*)\}/)?.[1] ?? '';
-
-    expect(baseRule).toContain('--reveal-delay: 0ms');
-    expect(baseRule).not.toMatch(/opacity|visibility|display|transform/);
-    expect(landingCss).toContain(
-      'animation: reveal-up 420ms var(--reveal-delay) cubic-bezier(0, 0, 0.38, 0.9) both;',
-    );
-    expect(landingCss).toContain(
-      'from { opacity: 0; transform: translate3d(0, 12px, 0); }',
-    );
-    expect(landingCss).toContain(
-      'to { opacity: 1; transform: translate3d(0, 0, 0); }',
-    );
-    expect(landingCss).not.toContain('blur(3px)');
-    expect(landingCss).not.toContain('@keyframes reveal-left');
-    expect(landingCss).not.toContain('@keyframes reveal-right');
-    expect(landingCss).toContain('@keyframes reveal-fade');
-    expect(landingCss).toContain(
-      'animation: reveal-fade 240ms var(--reveal-delay) ease-out both !important;',
-    );
-    expect(landingCss).toContain('stroke-dashoffset: 0 !important;');
+    expect(landingCss).toContain('"Noto Sans SC Variable"');
+    expect(landingCss).not.toContain('.scroll-reveal');
+    expect(artifactBaseRule).not.toMatch(/opacity|visibility|display|transform/);
+    expect(landingCss).toContain('@keyframes hero-enter');
+    expect(landingCss).toContain('@keyframes artifact-detail-enter');
+    expect(landingCss).toContain('min-height: clamp(620px, 78svh, 760px);');
+    expect(landingCss).toContain('@media (prefers-reduced-motion: reduce)');
+    expect(landingCss).toContain('animation: none !important;');
+    expect(landingCss).not.toMatch(/(?:repeating-)?linear-gradient/);
   });
 });

@@ -342,22 +342,12 @@ export default function App() {
 
   if (route.page === 'home') {
     return (
-      <>
-        <LandingPage
-          onStart={(seed, mode) => openCreator(seed, mode)}
-          onOpenSample={() => navigate({ page: 'workspace', projectId: sampleProject.id })}
-          onOpenTrends={() => navigate({ page: 'trends' })}
-        />
-        <CreateProjectModal
-          open={modalOpen}
-          busy={creating}
-          seed={creationSeed}
-          mode={creationMode}
-          initial={creationInitial}
-          onClose={() => !creating && setModalOpen(false)}
-          onCreate={createProject}
-        />
-      </>
+      <LandingPage
+        busy={creating}
+        onCreate={createProject}
+        onOpenSample={() => navigate({ page: 'workspace', projectId: sampleProject.id })}
+        onOpenTrends={() => navigate({ page: 'trends' })}
+      />
     );
   }
 
