@@ -87,21 +87,72 @@ function useRevealOnce<T extends HTMLElement>(threshold = 0.34) {
   return { ref, active };
 }
 
+function useProcessStepReveal<T extends HTMLElement>() {
+  const ref = useRef<T>(null);
+  const [active, setActive] = useState(false);
+  const [revealed, setRevealed] = useState({ copy: false, artifact: false });
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element || typeof IntersectionObserver === 'undefined') return;
+
+    const copy = element.querySelector<HTMLElement>('.process-step-copy');
+    const artifact = element.querySelector<HTMLElement>('.process-step-artifact');
+    if (!copy || !artifact) return;
+
+    const targetKinds = new Map<Element, keyof typeof revealed>([
+      [copy, 'copy'],
+      [artifact, 'artifact'],
+    ]);
+    const remaining = new Set(targetKinds.keys());
+    let observer: IntersectionObserver;
+
+    try {
+      observer = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting || !remaining.has(entry.target)) continue;
+          const kind = targetKinds.get(entry.target);
+          if (!kind) continue;
+
+          setActive(true);
+          const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+          if (!prefersReducedMotion() && entry.boundingClientRect.top >= viewportHeight) {
+            setRevealed((current) => (current[kind] ? current : { ...current, [kind]: true }));
+          }
+
+          remaining.delete(entry.target);
+          observer.unobserve(entry.target);
+        }
+
+        if (remaining.size === 0) observer.disconnect();
+      }, { rootMargin: '0px 0px 10% 0px', threshold: 0.08 });
+    } catch {
+      return;
+    }
+
+    observer.observe(copy);
+    observer.observe(artifact);
+    return () => observer.disconnect();
+  }, []);
+
+  return { ref, active, revealed };
+}
+
 function ProcessStep({ index, title, description, detail, reverse = false, children }: StageStepProps) {
-  const { ref, active } = useRevealOnce<HTMLElement>();
+  const { ref, active, revealed } = useProcessStepReveal<HTMLElement>();
   return (
     <article
       ref={ref}
       className={`process-step ${reverse ? 'process-step--reverse' : ''}`}
       data-active={active ? 'true' : undefined}
     >
-      <div className="process-step-copy">
+      <div className="process-step-copy" data-reveal={revealed.copy ? 'true' : undefined}>
         <span className="process-step-number">{String(index).padStart(2, '0')}</span>
         <h3>{title}</h3>
         <p>{description}</p>
         <small>{detail}</small>
       </div>
-      <div className="process-step-artifact">{children}</div>
+      <div className="process-step-artifact" data-reveal={revealed.artifact ? 'true' : undefined}>{children}</div>
       <i className="process-step-marker" aria-hidden="true" />
     </article>
   );

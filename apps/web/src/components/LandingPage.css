@@ -770,36 +770,40 @@
   transform: translate(-5px, -50%) scale(1.18);
 }
 
-.process-step[data-active="true"]:not(.process-step--reverse) .process-step-artifact {
-  animation: artifact-arrive-right 430ms var(--landing-ease) both;
+.process-step:not(.process-step--reverse) .process-step-copy[data-reveal="true"] {
+  animation: process-copy-arrive-left 520ms var(--landing-ease) both;
 }
 
-.process-step[data-active="true"].process-step--reverse .process-step-artifact {
-  animation: artifact-arrive-left 430ms var(--landing-ease) both;
+.process-step:not(.process-step--reverse) .process-step-artifact[data-reveal="true"] {
+  animation: process-artifact-arrive-right 560ms 100ms var(--landing-ease) both;
 }
 
-.process-step[data-active="true"] .artifact > * {
-  animation: artifact-detail-enter 340ms cubic-bezier(.22, 1, .36, 1) both;
+.process-step.process-step--reverse .process-step-copy[data-reveal="true"] {
+  animation: process-copy-arrive-right 520ms var(--landing-ease) both;
 }
 
-.process-step[data-active="true"] .artifact > :nth-child(2) { animation-delay: 90ms; }
-.process-step[data-active="true"] .artifact > :nth-child(3) { animation-delay: 180ms; }
-.process-step[data-active="true"] .artifact > :nth-child(4) { animation-delay: 270ms; }
-.process-step[data-active="true"] .artifact > :nth-child(5) { animation-delay: 360ms; }
-
-@keyframes artifact-detail-enter {
-  from { transform: translateY(7px); }
-  to { transform: translateY(0); }
+.process-step.process-step--reverse .process-step-artifact[data-reveal="true"] {
+  animation: process-artifact-arrive-left 560ms 100ms var(--landing-ease) both;
 }
 
-@keyframes artifact-arrive-right {
-  from { transform: translateX(24px) scale(.99); }
-  to { transform: translateX(0) scale(1); }
+@keyframes process-copy-arrive-left {
+  from { opacity: 0; transform: translate3d(-52px, 0, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
-@keyframes artifact-arrive-left {
-  from { transform: translateX(-24px) scale(.99); }
-  to { transform: translateX(0) scale(1); }
+@keyframes process-copy-arrive-right {
+  from { opacity: 0; transform: translate3d(52px, 0, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes process-artifact-arrive-right {
+  from { opacity: 0; transform: translate3d(68px, 0, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes process-artifact-arrive-left {
+  from { opacity: 0; transform: translate3d(-68px, 0, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
 .artifact {
@@ -1490,14 +1494,24 @@
     font-size: 2rem;
   }
 
-  .process-step[data-active="true"] .process-step-artifact,
-  .process-step[data-active="true"].process-step--reverse .process-step-artifact {
-    animation: artifact-arrive-mobile 260ms var(--landing-ease) both;
+  .process-step:not(.process-step--reverse) .process-step-copy[data-reveal="true"],
+  .process-step.process-step--reverse .process-step-copy[data-reveal="true"] {
+    animation: process-copy-arrive-mobile 360ms var(--landing-ease) both;
   }
 
-  @keyframes artifact-arrive-mobile {
-    from { transform: translateY(12px); }
-    to { transform: translateY(0); }
+  .process-step:not(.process-step--reverse) .process-step-artifact[data-reveal="true"],
+  .process-step.process-step--reverse .process-step-artifact[data-reveal="true"] {
+    animation: process-artifact-arrive-mobile 420ms 60ms var(--landing-ease) both;
+  }
+
+  @keyframes process-copy-arrive-mobile {
+    from { opacity: 0; transform: translate3d(0, 16px, 0); }
+    to { opacity: 1; transform: translate3d(0, 0, 0); }
+  }
+
+  @keyframes process-artifact-arrive-mobile {
+    from { opacity: 0; transform: translate3d(0, 18px, 0); }
+    to { opacity: 1; transform: translate3d(0, 0, 0); }
   }
 
   .artifact-script pre {
@@ -1615,9 +1629,11 @@
     transition-duration: .01ms !important;
   }
 
+  .process-step-copy,
   .process-step-artifact,
   .finale-fragments i {
     opacity: 1;
+    transform: none;
     animation: none !important;
   }
 

@@ -38,6 +38,45 @@ function fillProjectSetup() {
   fireEvent.change(screen.getByLabelText('气质与语调'), { target: { value: '克制、紧张' } });
 }
 
+type RecordedObserver = {
+  callback: IntersectionObserverCallback;
+  options: IntersectionObserverInit | undefined;
+  observe: ReturnType<typeof vi.fn>;
+  unobserve: ReturnType<typeof vi.fn>;
+  disconnect: ReturnType<typeof vi.fn>;
+};
+
+function stubIntersectionObservers() {
+  const observers: RecordedObserver[] = [];
+
+  class MockIntersectionObserver {
+    readonly root = null;
+    readonly rootMargin: string;
+    readonly thresholds: readonly number[];
+    readonly observe = vi.fn();
+    readonly disconnect = vi.fn();
+    readonly unobserve = vi.fn();
+
+    constructor(callback: IntersectionObserverCallback, options?: IntersectionObserverInit) {
+      this.rootMargin = options?.rootMargin ?? '0px';
+      const threshold = options?.threshold ?? 0;
+      this.thresholds = Array.isArray(threshold) ? threshold : [threshold];
+      observers.push({
+        callback,
+        options,
+        observe: this.observe,
+        unobserve: this.unobserve,
+        disconnect: this.disconnect,
+      });
+    }
+
+    takeRecords = () => [];
+  }
+
+  vi.stubGlobal('IntersectionObserver', MockIntersectionObserver);
+  return observers;
+}
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -196,72 +235,122 @@ describe('LandingPage', () => {
     vi.stubGlobal('IntersectionObserver', undefined);
     renderLanding();
 
-    const heading = screen.getByRole('heading', { name: '先把故事说清楚' });
-    const stage = heading.closest('.process-step');
-    expect(heading).toBeVisible();
-    expect(stage).not.toHaveAttribute('data-active');
-    expect(screen.getAllByRole('article').filter((element) => element.classList.contains('process-step'))).toHaveLength(6);
+    const stages = screen.getAllByRole('article').filter((element) => element.classList.contains('process-step'));
+    expect(stages).toHaveLength(6);
+    for (const stage of stages) {
+      expect(stage).not.toHaveAttribute('data-active');
+      expect(stage.querySelector('.process-step-copy')).toBeVisible();
+      expect(stage.querySelector('.process-step-artifact')).toBeVisible();
+      expect(stage.querySelector('[data-reveal="true"]')).not.toBeInTheDocument();
+    }
   });
 
-  it('activates a process stage once and disconnects its observer', async () => {
-    const observers: Array<{
-      callback: IntersectionObserverCallback;
-      options: IntersectionObserverInit | undefined;
-      observe: ReturnType<typeof vi.fn>;
-      disconnect: ReturnType<typeof vi.fn>;
-    }> = [];
+  it('mounts both reveal targets and alternates the process layout', () => {
+    renderLanding();
 
-    class MockIntersectionObserver {
-      readonly root = null;
-      readonly rootMargin: string;
-      readonly thresholds: readonly number[];
-      readonly observe = vi.fn();
-      readonly disconnect = vi.fn();
-      readonly unobserve = vi.fn();
-
-      constructor(callback: IntersectionObserverCallback, options?: IntersectionObserverInit) {
-        this.rootMargin = options?.rootMargin ?? '0px';
-        const threshold = options?.threshold ?? 0;
-        this.thresholds = Array.isArray(threshold) ? threshold : [threshold];
-        observers.push({ callback, options, observe: this.observe, disconnect: this.disconnect });
-      }
-
-      takeRecords = () => [];
+    const stages = screen.getAllByRole('article').filter((element) => element.classList.contains('process-step'));
+    expect(stages.map((stage) => stage.classList.contains('process-step--reverse')))
+      .toEqual([false, true, false, true, false, true]);
+    for (const stage of stages) {
+      expect(Array.from(stage.children).filter((child) => child.classList.contains('process-step-copy'))).toHaveLength(1);
+      expect(Array.from(stage.children).filter((child) => child.classList.contains('process-step-artifact'))).toHaveLength(1);
     }
+  });
 
-    vi.stubGlobal('IntersectionObserver', MockIntersectionObserver);
+  it('reveals each process side before it enters the physical viewport', async () => {
+    const observers = stubIntersectionObservers();
     renderLanding();
 
     const stage = screen.getByRole('heading', { name: '先把故事说清楚' }).closest('.process-step')!;
-    const observer = observers.find(({ observe }) => observe.mock.calls.some(([target]) => target === stage));
-    expect(observer?.options).toEqual({ rootMargin: '0px 0px -16% 0px', threshold: 0.34 });
+    const copy = stage.querySelector('.process-step-copy')!;
+    const artifact = stage.querySelector('.process-step-artifact')!;
+    const observer = observers.find(({ observe }) => observe.mock.calls.some(([target]) => target === copy));
+    expect(observer?.options).toEqual({ rootMargin: '0px 0px 10% 0px', threshold: 0.08 });
+    expect(observer?.observe).toHaveBeenCalledWith(copy);
+    expect(observer?.observe).toHaveBeenCalledWith(artifact);
     expect(stage).not.toHaveAttribute('data-active');
 
     act(() => observer?.callback(
-      [{ isIntersecting: false } as IntersectionObserverEntry],
+      [{ isIntersecting: false, target: copy } as unknown as IntersectionObserverEntry],
       {} as IntersectionObserver,
     ));
     expect(observer?.disconnect).not.toHaveBeenCalled();
 
     act(() => observer?.callback(
-      [{ isIntersecting: true } as IntersectionObserverEntry],
+      [{
+        isIntersecting: true,
+        target: copy,
+        boundingClientRect: { top: window.innerHeight + 40 },
+      } as unknown as IntersectionObserverEntry],
       {} as IntersectionObserver,
     ));
     await waitFor(() => expect(stage).toHaveAttribute('data-active', 'true'));
+    expect(copy).toHaveAttribute('data-reveal', 'true');
+    expect(artifact).not.toHaveAttribute('data-reveal');
+    expect(observer?.unobserve).toHaveBeenCalledWith(copy);
+    expect(observer?.disconnect).not.toHaveBeenCalled();
+
+    act(() => observer?.callback(
+      [{
+        isIntersecting: true,
+        target: artifact,
+        boundingClientRect: { top: window.innerHeight + 30 },
+      } as unknown as IntersectionObserverEntry],
+      {} as IntersectionObserver,
+    ));
+    await waitFor(() => expect(artifact).toHaveAttribute('data-reveal', 'true'));
+    expect(observer?.unobserve).toHaveBeenCalledWith(artifact);
     expect(observer?.disconnect).toHaveBeenCalledOnce();
+  });
+
+  it('does not restart an entrance when the observer reports already-visible content', async () => {
+    const observers = stubIntersectionObservers();
+    renderLanding();
+
+    const stage = screen.getByRole('heading', { name: '先把故事说清楚' }).closest('.process-step')!;
+    const copy = stage.querySelector('.process-step-copy')!;
+    const observer = observers.find(({ observe }) => observe.mock.calls.some(([target]) => target === copy));
+
+    act(() => observer?.callback(
+      [{
+        isIntersecting: true,
+        target: copy,
+        boundingClientRect: { top: window.innerHeight - 20 },
+      } as unknown as IntersectionObserverEntry],
+      {} as IntersectionObserver,
+    ));
+
+    await waitFor(() => expect(stage).toHaveAttribute('data-active', 'true'));
+    expect(copy).not.toHaveAttribute('data-reveal');
+    expect(observer?.unobserve).toHaveBeenCalledWith(copy);
   });
 
   it('keeps the typography and motion contract in CSS', () => {
     const artifactBaseRule = landingCss.match(/\.process-step-artifact\s*\{([^}]*)\}/)?.[1] ?? '';
+    const copyBaseRule = landingCss.match(/\.process-step-copy\s*\{([^}]*)\}/)?.[1] ?? '';
+    const mobileMotionCss = landingCss.slice(
+      landingCss.indexOf('@media (max-width: 760px)'),
+      landingCss.indexOf('@media (max-width: 420px)'),
+    );
+    const reducedMotionCss = landingCss.slice(landingCss.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
 
     expect(landingCss).toContain('"Noto Sans SC Variable"');
     expect(landingCss).not.toContain('.scroll-reveal');
     expect(artifactBaseRule).not.toMatch(/opacity|visibility|display|transform/);
+    expect(copyBaseRule).not.toMatch(/opacity|visibility|display|transform/);
     expect(landingCss).toContain('@keyframes hero-enter');
-    expect(landingCss).toContain('@keyframes artifact-detail-enter');
+    expect(landingCss).toMatch(/\.process-step:not\(\.process-step--reverse\) \.process-step-copy\[data-reveal="true"\]\s*{[^}]*process-copy-arrive-left/);
+    expect(landingCss).toMatch(/\.process-step:not\(\.process-step--reverse\) \.process-step-artifact\[data-reveal="true"\]\s*{[^}]*process-artifact-arrive-right/);
+    expect(landingCss).toMatch(/\.process-step\.process-step--reverse \.process-step-copy\[data-reveal="true"\]\s*{[^}]*process-copy-arrive-right/);
+    expect(landingCss).toMatch(/\.process-step\.process-step--reverse \.process-step-artifact\[data-reveal="true"\]\s*{[^}]*process-artifact-arrive-left/);
+    expect(landingCss).toMatch(/@keyframes process-copy-arrive-left\s*{[\s\S]*?from\s*{[^}]*opacity:\s*0;[^}]*translate3d\(-\d+px/);
+    expect(landingCss).toMatch(/@keyframes process-copy-arrive-right\s*{[\s\S]*?from\s*{[^}]*opacity:\s*0;[^}]*translate3d\(\d+px/);
+    expect(landingCss).toMatch(/@keyframes process-artifact-arrive-right\s*{[\s\S]*?from\s*{[^}]*opacity:\s*0;[^}]*translate3d\(\d+px/);
+    expect(landingCss).toMatch(/@keyframes process-artifact-arrive-left\s*{[\s\S]*?from\s*{[^}]*opacity:\s*0;[^}]*translate3d\(-\d+px/);
+    expect(mobileMotionCss).toMatch(/\.process-step:not\(\.process-step--reverse\) \.process-step-copy\[data-reveal="true"\],[\s\S]*?process-copy-arrive-mobile/);
+    expect(mobileMotionCss).toMatch(/\.process-step:not\(\.process-step--reverse\) \.process-step-artifact\[data-reveal="true"\],[\s\S]*?process-artifact-arrive-mobile/);
     expect(landingCss).toContain('min-height: clamp(620px, 78svh, 760px);');
-    expect(landingCss).toContain('@media (prefers-reduced-motion: reduce)');
-    expect(landingCss).toContain('animation: none !important;');
+    expect(reducedMotionCss).toMatch(/\.process-step-copy,\s*\.process-step-artifact,[\s\S]*?{[^}]*opacity:\s*1;[^}]*transform:\s*none;[^}]*animation:\s*none !important;/);
     expect(landingCss).not.toMatch(/(?:repeating-)?linear-gradient/);
   });
 });
