@@ -1,3 +1,3 @@
 services:
   web:
-    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile.bootstrap", "--adapter", "caddyfile"]
+    command: ["nginx", "-g", "daemon off;", "-c", "/etc/nginx/nginx.bootstrap.conf"]

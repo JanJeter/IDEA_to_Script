@@ -7,8 +7,8 @@ RUN npm ci
 COPY . .
 RUN npm run build -w @idea2screenplay/web
 
-FROM caddy:2.10-alpine
-COPY apps/web/Caddyfile /etc/caddy/Caddyfile
-COPY apps/web/Caddyfile.bootstrap /etc/caddy/Caddyfile.bootstrap
+FROM nginx:1.27-alpine
+COPY apps/web/nginx.conf /etc/nginx/nginx.conf
+COPY apps/web/nginx.bootstrap.conf /etc/nginx/nginx.bootstrap.conf
 COPY --from=build /app/apps/web/dist /srv
 EXPOSE 80 443
