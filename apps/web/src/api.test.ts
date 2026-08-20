@@ -14,57 +14,33 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('API client authentication lifecycle', () => {
+describe('API client access lifecycle', () => {
   it('preserves HTTP status and announces a protected-route 401', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(401, { message: '请先登录' })));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(401, { message: '需要有效访问码' })));
     const unauthorized = vi.fn();
-    window.addEventListener('ids:authentication-required', unauthorized, { once: true });
+    window.addEventListener('ids:unauthorized', unauthorized, { once: true });
 
     const error = await api.listProjects().catch((reason: unknown) => reason);
     expect(error).toBeInstanceOf(ApiError);
-    expect(error).toMatchObject({ status: 401, message: '请先登录' });
+    expect(error).toMatchObject({ status: 401, message: '需要有效访问码' });
     expect(unauthorized).toHaveBeenCalledTimes(1);
   });
 
-  it('sends the username and password contract when registering', async () => {
-    const request = vi.fn().mockResolvedValue(response(201, {
-      authenticated: true,
-      user: { id: 'user-1', username: '编剧小林' },
-    }));
+  it('uses the custom anti-CSRF marker for access authorization', async () => {
+    const request = vi.fn().mockResolvedValue(response(201, { required: true, authorized: true }));
     vi.stubGlobal('fetch', request);
 
-    await api.register('编剧小林', 'story-room-2026', 'story-room-2026');
+    await api.authorizeAccess('seat-code');
 
     expect(request).toHaveBeenCalledWith(
-      expect.stringContaining('/auth/register'),
+      expect.stringContaining('/access/authorize'),
       expect.objectContaining({
         method: 'POST',
-        credentials: 'include',
-        body: JSON.stringify({
-          username: '编剧小林',
-          password: 'story-room-2026',
-          passwordConfirmation: 'story-room-2026',
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+          'X-IDS-Access': 'authorize',
         }),
       }),
     );
-  });
-
-  it('does not announce expected login failures as an expired session', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(401, { message: '账号或密码错误' })));
-    const unauthorized = vi.fn();
-    window.addEventListener('ids:authentication-required', unauthorized, { once: true });
-
-    await expect(api.login('编剧小林', 'wrong-password')).rejects.toMatchObject({
-      status: 401,
-      message: '账号或密码错误',
-    });
-    expect(unauthorized).not.toHaveBeenCalled();
-  });
-
-  it('accepts a no-content logout response', async () => {
-    const request = vi.fn().mockResolvedValue(response(204, undefined));
-    vi.stubGlobal('fetch', request);
-
-    await expect(api.logout()).resolves.toEqual({ authenticated: false, user: null });
   });
 });

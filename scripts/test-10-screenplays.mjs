@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module';
-import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const require = createRequire(import.meta.url);
@@ -7,8 +7,6 @@ const { solveChallenge } = require('altcha-lib');
 const { deriveKey } = require('altcha-lib/algorithms/pbkdf2');
 
 const apiUrl = process.env.TEST_API_URL ?? 'http://localhost:3000/api';
-const webOrigin = process.env.TEST_WEB_ORIGIN ?? new URL(apiUrl).origin;
-const testUsername = process.env.TEST_USERNAME?.trim();
 const stages = ['PREMISE', 'CHARACTERS', 'LOCATIONS', 'BEATS', 'SCENES', 'SCRIPT'];
 const seeds = [
   {
@@ -96,12 +94,12 @@ function updateCookie(response) {
     : [response.headers.get('set-cookie')].filter(Boolean);
   for (const value of values) {
     const pair = value.split(';', 1)[0];
-    if (pair.startsWith('ids_session=') || pair.startsWith('__Host-ids_session=')) cookie = pair;
+    if (pair.startsWith('ids_visitor=')) cookie = pair;
   }
 }
 
 async function request(endpoint, options = {}) {
-  const headers = { Accept: 'application/json', Origin: webOrigin, ...(options.headers ?? {}) };
+  const headers = { Accept: 'application/json', ...(options.headers ?? {}) };
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
   if (cookie) headers.Cookie = cookie;
 
@@ -129,23 +127,6 @@ async function request(endpoint, options = {}) {
     throw new Error(`${options.method ?? 'GET'} ${endpoint}: ${message}`);
   }
   return payload;
-}
-
-async function readTestPassword() {
-  const passwordFile = process.env.TEST_PASSWORD_FILE;
-  if (!testUsername || !passwordFile) {
-    throw new Error('Set TEST_USERNAME and TEST_PASSWORD_FILE before running this authenticated test');
-  }
-  const metadata = await stat(passwordFile);
-  if (!metadata.isFile() || metadata.size > 1_024) {
-    throw new Error('TEST_PASSWORD_FILE must be a small regular file');
-  }
-  if (process.platform !== 'win32' && (metadata.mode & 0o077) !== 0) {
-    throw new Error('TEST_PASSWORD_FILE must not be readable by group or other users');
-  }
-  const password = (await readFile(passwordFile, 'utf8')).replace(/\r?\n$/, '');
-  if (!password || password.length > 256) throw new Error('TEST_PASSWORD_FILE contains an invalid password');
-  return password;
 }
 
 async function waitForJob(job, screenplayNumber) {
@@ -327,11 +308,6 @@ async function persistReport() {
 
 await mkdir(outputDirectory, { recursive: true });
 log(`output directory: ${outputDirectory}`);
-await request('/auth/login', {
-  method: 'POST',
-  body: JSON.stringify({ identifier: testUsername, password: await readTestPassword() }),
-});
-log(`authenticated test account: ${testUsername}`);
 
 for (let index = 0; index < seeds.length; index += 1) {
   const result = await runScreenplay(seeds[index], index);

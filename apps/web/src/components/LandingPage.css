@@ -1,16 +1,16 @@
 .landing-page {
-  --landing-bg: var(--paper);
-  --landing-surface: var(--paper-light);
-  --landing-surface-muted: var(--paper-dark);
-  --landing-ink: var(--ink);
-  --landing-text: var(--ink-soft);
-  --landing-muted: #6f6b64;
-  --landing-line: var(--line);
-  --landing-line-strong: #b8b0a2;
-  --landing-accent: var(--signal);
-  --landing-accent-dark: var(--signal-dark);
-  --landing-accent-soft: #f1dfda;
-  --landing-success: #477d5d;
+  --landing-bg: #f4f4f1;
+  --landing-surface: #ffffff;
+  --landing-surface-muted: #e9e9e5;
+  --landing-ink: #191918;
+  --landing-text: #484844;
+  --landing-muted: #666660;
+  --landing-line: #d2d2cc;
+  --landing-line-strong: #9d9d95;
+  --landing-accent: #b44738;
+  --landing-accent-dark: #91372d;
+  --landing-accent-soft: #f4e4e0;
+  --landing-success: #356a4d;
   --landing-error: #9d3429;
   --landing-ease: cubic-bezier(0.16, 1, 0.3, 1);
   min-height: 100vh;
@@ -167,41 +167,6 @@
   justify-self: end;
   padding: 0 17px;
 }
-
-.landing-session-actions {
-  display: flex;
-  justify-self: end;
-  align-items: center;
-  gap: 12px;
-}
-
-.nav-login {
-  min-height: 40px;
-  padding: 0 4px;
-  color: var(--landing-text);
-  background: transparent;
-  border: 0;
-  border-bottom: 1px solid var(--landing-line-strong);
-  font-size: .8125rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.nav-login:hover { color: var(--landing-accent-dark); border-bottom-color: var(--landing-accent-dark); }
-
-.landing-user {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 7px;
-  color: var(--landing-text);
-  font-size: .75rem;
-  font-weight: 700;
-}
-
-.landing-user > span { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.landing-user > button { padding: 3px 0; color: var(--landing-muted); background: transparent; border: 0; border-bottom: 1px solid transparent; font-size: .6875rem; cursor: pointer; }
-.landing-user > button:hover { color: var(--landing-accent-dark); border-bottom-color: var(--landing-accent-dark); }
 
 .landing-primary {
   padding: 0 18px;
@@ -1376,9 +1341,6 @@
     font-size: .8125rem;
   }
 
-  .landing-session-actions { gap: 8px; }
-  .landing-user > span { display: none; }
-
   .landing-hero {
     width: 100%;
     min-height: 0;
@@ -1623,11 +1585,8 @@
   }
 
   .nav-start {
-    display: none;
+    padding-inline: 11px;
   }
-
-  .nav-login { font-size: .75rem; }
-  .landing-user > svg { display: none; }
 
   .hero-copy h1 {
     font-size: 2.75rem;
