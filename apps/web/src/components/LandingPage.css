@@ -372,7 +372,7 @@
   background: transparent;
   border: 0;
   outline: 0;
-  resize: vertical;
+  resize: none;
   font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
   font-size: 1rem;
   font-weight: 400;

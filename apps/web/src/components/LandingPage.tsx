@@ -215,6 +215,18 @@ export function LandingPage({ busy = false, onCreate, onOpenSample, onOpenTrends
     if (setupOpen) titleRef.current?.focus();
   }, [setupOpen]);
 
+  useEffect(() => {
+    const textarea = inputRef.current;
+    if (!textarea) return;
+
+    textarea.style.height = 'auto';
+    const minHeight = mode === 'original' ? 92 : 150;
+    const maxHeight = 280;
+    const nextHeight = Math.min(Math.max(textarea.scrollHeight, minHeight), maxHeight);
+    textarea.style.height = `${nextHeight}px`;
+    textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden';
+  }, [mode, seed]);
+
   function selectMode(nextMode: CreationMode) {
     setMode(nextMode);
     setSetupOpen(false);
