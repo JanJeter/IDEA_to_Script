@@ -1,5 +1,6 @@
 {
 	auto_https off
+	default_sni 8.130.170.254
 }
 
 http://{$PUBLIC_IP} {
