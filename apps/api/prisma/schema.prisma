@@ -54,6 +54,11 @@ enum TrendPolicyAction {
   BLOCK
 }
 
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
 model Project {
   id                String                  @id @default(uuid())
   visitorId         String
@@ -146,6 +151,51 @@ model AnonymousVisitor {
   lastSeenAt  DateTime            @default(now())
   projects    Project[]
   dailyQuotas DailyVisitorQuota[]
+  user        User?
+}
+
+model User {
+  id                 String           @id @default(uuid())
+  username           String           @db.VarChar(32)
+  usernameNormalized String           @unique @db.VarChar(64)
+  passwordHash       String           @db.VarChar(255)
+  status             UserStatus       @default(ACTIVE)
+  visitorId          String           @unique
+  passwordChangedAt  DateTime         @default(now())
+  lastLoginAt        DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  visitor            AnonymousVisitor @relation(fields: [visitorId], references: [id], onDelete: Restrict)
+  sessions           AuthSession[]
+
+  @@index([status])
+}
+
+model AuthSession {
+  id         String    @id @default(uuid())
+  userId     String
+  tokenHash  String    @unique @db.VarChar(64)
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  lastSeenAt DateTime  @default(now())
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt, expiresAt])
+  @@index([expiresAt])
+}
+
+model AuthThrottle {
+  key             String   @id @db.VarChar(96)
+  scope           String   @db.VarChar(32)
+  subjectHash     String   @db.VarChar(64)
+  windowStartedAt DateTime
+  attempts        Int      @default(1)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([scope, subjectHash])
+  @@index([updatedAt])
 }
 
 model DailyVisitorQuota {

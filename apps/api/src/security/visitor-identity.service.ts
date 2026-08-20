@@ -104,6 +104,21 @@ export class VisitorIdentityService {
     return this.verifySignedToken(this.parseCookies(cookieHeader)[COOKIE_NAME]);
   }
 
+  readLegacyToken(cookieHeader: string | undefined) {
+    return this.readSignedToken(cookieHeader);
+  }
+
+  createVisitorTokenHash() {
+    return this.hashIdentityToken(randomBytes(32).toString('base64url'));
+  }
+
+  legacyVisitorTokenHashCandidates(token: string) {
+    const identityTokens = [this.sessionIdentityTokens.get(token), token].filter(
+      (candidate): candidate is string => Boolean(candidate),
+    );
+    return [...new Set(identityTokens.map((candidate) => this.hashIdentityToken(candidate)))];
+  }
+
   needsCookieRefresh(cookieHeader: string | undefined) {
     const value = this.parseCookies(cookieHeader)[COOKIE_NAME];
     const token = this.verifySignedToken(value);
