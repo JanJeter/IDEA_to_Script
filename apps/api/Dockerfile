@@ -6,6 +6,7 @@ RUN apt-get update -y \
 FROM base AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
+COPY apps/agent/package.json apps/agent/package.json
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
 RUN npm ci
@@ -15,6 +16,7 @@ RUN npm run db:generate && npm run build -w @idea2screenplay/api
 FROM base AS production-dependencies
 WORKDIR /app
 COPY package.json package-lock.json ./
+COPY apps/agent/package.json apps/agent/package.json
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY apps/api/prisma apps/api/prisma
@@ -29,6 +31,8 @@ ENV NODE_ENV=production \
 COPY --from=production-dependencies --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/apps/api/dist ./apps/api/dist
 COPY --from=build --chown=node:node /app/apps/api/prisma ./apps/api/prisma
+COPY --from=build --chown=node:node /app/apps/agent/dist ./apps/agent/dist
+COPY --chown=node:node apps/agent/package.json ./apps/agent/package.json
 COPY --chown=node:node apps/api/package.json ./apps/api/package.json
 USER node
 EXPOSE 3000

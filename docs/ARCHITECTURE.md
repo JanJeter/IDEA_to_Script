@@ -13,18 +13,21 @@ flowchart LR
   Boss --> Worker[Generation worker]
   Worker --> Stage[Single-stage generator]
   Stage -->|legacy| LLM[OpenAI-compatible LLM]
-  Stage -->|PREMISE feature flag| Agent[Run-scoped AgentRuntime]
+  Stage -->|PREMISE feature flag| Adapter[Nest Agent adapter]
+  Adapter --> Agent[apps/agent single-Agent runtime]
   Agent --> Skill[Explicit stage Skill]
   Agent --> Tools[Allow-listed domain tools]
+  Agent --> Context[Context budget / source chunks]
+  Adapter --> Memory[Structured project memory snapshot]
   Tools --> Validator[Zod validator]
   Agent --> LLM
   Stage --> Demo[Built-in demo writer]
   Stage --> Prisma
 ```
 
-`GenerationJobsService` 负责逐阶段任务、确认衔接、持久化事件和 Worker 状态，`GenerationQueueService` 负责 pg-boss。`GenerationService` 每次只执行一个阶段，并管理暂存版本编辑与最终激活。默认 legacy 路径仍由 `LlmService` 负责一次性 JSON 生成；PREMISE 可灰度切换到 `StageAgentRuntimeService`，以每次 Run 独立的工具白名单、显式 Skill、Zod 校验和受控提交完成阶段。Agent 返回的草稿仍由原有 Serializable 事务提交，不直接操作 Prisma。
+`GenerationJobsService` 负责逐阶段任务、确认衔接、持久化事件和 Worker 状态，`GenerationQueueService` 负责 pg-boss。`GenerationService` 每次只执行一个阶段，并管理暂存版本编辑与最终激活。默认 legacy 路径仍由 `LlmService` 负责一次性 JSON 生成；PREMISE 可灰度切换到独立的 `apps/agent` workspace。API 适配器只提供限定项目/版本的结构化 Memory 快照和 Capability，Agent 通过每次 Run 独立的工具白名单、显式 Skill、上下文预算、有限重试和 Zod 校验完成受控提交。Agent 返回的草稿仍由原有 Serializable 事务提交，不直接操作 Prisma。
 
-Agent 模式默认关闭。它不注册通用 Bash、文件、MCP、Cron、外部 API 或 Sub-Agent 工具，不使用本地 Session/Memory，也不替代 pg-boss、GenerationVersion 或人工确认工作流。
+Agent 模式默认关闭。当前采用单 Agent、每阶段新上下文，不注册通用 Bash、任意文件、MCP、Cron、外部 API 或 Sub-Agent 工具，不使用本地 Session/文件 Memory，也不替代 pg-boss、GenerationVersion 或人工确认工作流。长素材在预算内直接内联，超过预算时切成只读块并通过受控工具检索；项目事实来自 PostgreSQL 中的结构化状态。
 
 ## 生成阶段
 
@@ -44,9 +47,11 @@ Agent 模式默认关闭。它不注册通用 Bash、文件、MCP、Cron、外�
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/api/health`、`/api/health/live` | 不访问数据库的进程存活状态 |
-| GET | `/api/health/ready` | PostgreSQL 与 pg-boss 生成队列就绪状态；不创建访客 |
-| GET | `/api/access/session` | 查询私测门禁状态；不创建访客 |
-| POST | `/api/access/authorize` | 校验访问码并签发身份 Cookie |
+| GET | `/api/health/ready` | PostgreSQL 与 pg-boss 生成队列就绪状态；不创建账号 |
+| GET | `/api/auth/session` | 查询当前账号会话；未登录时返回匿名状态 |
+| POST | `/api/auth/register` | 创建账号并签发服务端会话 Cookie |
+| POST | `/api/auth/login` | 使用账号和密码登录 |
+| POST | `/api/auth/logout` | 吊销当前会话并清除 Cookie |
 | GET | `/api/projects` | 项目摘要列表 |
 | POST | `/api/projects` | 创建故事种子 |
 | GET | `/api/projects/:id` | 获取完整创作档案 |
@@ -77,9 +82,11 @@ Agent 模式默认关闭。它不注册通用 Bash、文件、MCP、Cron、外�
 
 事件类型：`job:queued`、`job:running`、`job:retrying`、`job:succeeded`、`pipeline:start`、`stage:start`、`stage:complete`、`pipeline:complete`、`error`。事件保存于 `GenerationJobEvent`；SSE 只是通知通道，断开时前端使用 Job 状态轮询兜底。
 
-## 匿名项目保留
+## 账号、会话与项目保留
 
-项目创建时写入固定的 `expiresAt = createdAt + 7 days`，不会因访问、编辑或生成顺延。项目、场景、生成、Job 和所有权查询都要求 `expiresAt > now`；因此项目到期后立即不可访问。pg-boss 的 `expired-project-cleanup` 队列按 `0 3 * * *`、`Asia/Shanghai` 每天执行一次物理删除，关联版本、运行、业务 Job 和事件由数据库外键级联清理。清理任务还会删除超过 `VISITOR_RETENTION_DAYS` 且没有任何项目的孤儿访客；健康和准入路由不会创建访客，活跃访客的 `lastSeenAt` 默认每 5 分钟至多写一次。
+密码使用 Argon2id 散列。浏览器只保存随机的 HttpOnly、SameSite=Lax 会话 Cookie；数据库只保存令牌 SHA-256 哈希，退出登录会在服务端撤销当前会话。`VisitorMiddleware` 从会话解析账号及其一对一 `AnonymousVisitor` 资源主体，现有项目、生成任务与额度因此仍按 `visitorId` 隔离。登录和注册同时按全局、IP 与标准化账号做数据库原子限流。所有受保护的写请求还要通过精确 `WEB_ORIGIN`/Referer 校验；生产认证强制 HTTPS 与 Secure Cookie。
+
+项目创建时写入固定的 `expiresAt = createdAt + 7 days`，不会因访问、编辑或生成顺延。项目、场景、生成、Job 和所有权查询都要求 `expiresAt > now`；因此项目到期后立即不可访问。pg-boss 的 `expired-project-cleanup` 队列按 `0 3 * * *`、`Asia/Shanghai` 每天执行一次物理删除，关联版本、运行、业务 Job 和事件由数据库外键级联清理。清理任务会删除过期会话、过期限流桶，以及超过 `VISITOR_RETENTION_DAYS`、没有账号和项目的孤儿访客。
 
 ## 下一阶段建议
 

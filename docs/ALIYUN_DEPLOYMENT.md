@@ -74,8 +74,9 @@
     VISITOR_IDENTITY_KEY=随机长字符串
     IP_HASH_KEY=随机长字符串
     ALTCHA_HMAC_KEY=随机长字符串
+    AUTH_THROTTLE_KEY=随机长字符串
+    AUTH_SESSION_DAYS=30
     DEMO_MODE=true
-    ACCESS_CONTROL_REQUIRED=true
 
 生成随机密钥：
 
@@ -83,16 +84,11 @@
 
 不要把 .env.production 提交到 Git 或发送给他人。
 
-## 7. 生成访问码
+## 7. 先配置 HTTPS
 
-在项目根目录执行：
+账号密码注册和登录禁止运行在明文 HTTP 上。先按 [固定公网 IP 部署手册](./IP_DEPLOYMENT.md) 完成 HTTP bootstrap、Certbot IP 证书签发和 HTTPS 切换；bootstrap 阶段只检查公开首页和健康状态，不要输入真实密码。
 
-    npm install
-    npm run access-codes:generate -- 20
-
-把输出的访问码写入 .env.production，例如：
-
-    APP_ACCESS_CODES=访问码1,访问码2,访问码3
+从旧访问码版本升级时，可暂时把原 `APP_ACCESS_CODES` 保留在 `.env.production`，仅用于让带旧 Cookie 的浏览器在注册时认领原项目。新页面和接口不再接收访问码；全新部署保持 `APP_ACCESS_CODES=` 即可。
 
 ## 8. 启动生产服务
 
@@ -113,13 +109,11 @@
 
     curl http://127.0.0.1:3000/api/health
 
-浏览器访问：
-
-    http://你的公网IPv4
-
-如果生产证书已经配置，再访问：
+浏览器仅使用 HTTPS 验证注册和登录：
 
     https://你的公网IPv4
+
+`http://你的公网IPv4` 应自动跳转到 HTTPS。确认浏览器显示受信任证书后，才可输入真实密码。
 
 ## 10. 常用运维命令
 

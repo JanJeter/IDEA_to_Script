@@ -2,9 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, Bot, CircleHelp, Menu, X } from 'lucide-react';
 import { solveChallenge } from 'altcha-lib';
 import { deriveKey } from 'altcha-lib/algorithms/web/pbkdf2';
-import { api } from './api';
-import { AccessGate } from './components/AccessGate';
+import { ApiError, api } from './api';
+import { AuthPage, type AuthMode } from './components/AuthPage';
 import { CreateProjectModal } from './components/CreateProjectModal';
+import { CreationTransition } from './components/CreationTransition';
 import { LandingPage } from './components/LandingPage';
 import { Sidebar } from './components/Sidebar';
 import { Studio } from './components/Studio';
@@ -13,7 +14,7 @@ import { useGenerationJob } from './hooks/useGenerationJob';
 import { sampleProject, sampleSummary } from './sample-project';
 import type {
   CreateProjectInput,
-  AccessSession,
+  AuthSession,
   Health,
   Project,
   ProjectSummary,
@@ -22,10 +23,13 @@ import type {
   TrendBriefResponse,
 } from './types';
 
-type Route = { page: 'home' } | { page: 'trends' } | { page: 'workspace'; projectId: string };
+type ContentRoute = { page: 'home' } | { page: 'trends' } | { page: 'workspace'; projectId: string };
+type Route = ContentRoute | { page: 'auth'; mode: AuthMode };
 type CreationMode = 'original' | 'adaptation' | 'trend';
 
 function readRoute(): Route {
+  if (/^\/register\/?$/.test(window.location.pathname)) return { page: 'auth', mode: 'register' };
+  if (/^\/login\/?$/.test(window.location.pathname)) return { page: 'auth', mode: 'login' };
   if (/^\/trends\/?$/.test(window.location.pathname)) return { page: 'trends' };
   const match = window.location.pathname.match(/^\/workspace\/([^/]+)\/?$/);
   return match ? { page: 'workspace', projectId: decodeURIComponent(match[1]) } : { page: 'home' };
@@ -39,8 +43,13 @@ export default function App() {
     return initialRoute.page === 'workspace' && initialRoute.projectId === sampleProject.id ? sampleProject : undefined;
   });
   const [health, setHealth] = useState<Health>();
-  const [access, setAccess] = useState<AccessSession>();
-  const [accessChecking, setAccessChecking] = useState(true);
+  const [session, setSession] = useState<AuthSession>();
+  const [sessionChecking, setSessionChecking] = useState(true);
+  const [authReturn, setAuthReturn] = useState<ContentRoute>(() => {
+    const initialRoute = readRoute();
+    return initialRoute.page === 'auth' ? { page: 'home' } : initialRoute;
+  });
+  const [pendingCreation, setPendingCreation] = useState<CreateProjectInput>();
   const [loading, setLoading] = useState(route.page === 'workspace' && route.projectId !== sampleProject.id);
   const [creating, setCreating] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -49,15 +58,27 @@ export default function App() {
   const [creationInitial, setCreationInitial] = useState<CreateProjectInput>();
   const [error, setError] = useState('');
   const [mobileNav, setMobileNav] = useState(false);
+  const [creationTransition, setCreationTransition] = useState<{ title: string; logline: string; projectId?: string }>();
 
   const isSample = project?.id === sampleProject.id;
 
   const navigate = useCallback((next: Route, replace = false) => {
-    const path = next.page === 'home' ? '/' : next.page === 'trends' ? '/trends' : `/workspace/${encodeURIComponent(next.projectId)}`;
+    const path = next.page === 'home'
+      ? '/'
+      : next.page === 'trends'
+        ? '/trends'
+        : next.page === 'auth'
+          ? `/${next.mode}`
+          : `/workspace/${encodeURIComponent(next.projectId)}`;
     window.history[replace ? 'replaceState' : 'pushState']({}, '', path);
     setRoute(next);
     window.scrollTo({ top: 0 });
   }, []);
+
+  const requestAuthentication = useCallback((returnTo: ContentRoute, mode: AuthMode = 'login', replace = false) => {
+    setAuthReturn(returnTo);
+    navigate({ page: 'auth', mode }, replace);
+  }, [navigate]);
 
   const refreshList = useCallback(async () => {
     const list = await api.listProjects();
@@ -111,37 +132,57 @@ export default function App() {
 
   useEffect(() => {
     const onUnauthorized = () => {
-      setAccess({ required: true, authorized: false });
+      setSession({ authenticated: false, user: null });
       setProjects([]);
       setProject((current) => (current?.id === sampleProject.id ? current : undefined));
       resetGeneration();
+      const returnTo = route.page === 'auth' ? authReturn : route;
+      requestAuthentication(returnTo, 'login');
     };
-    window.addEventListener('ids:unauthorized', onUnauthorized);
-    return () => window.removeEventListener('ids:unauthorized', onUnauthorized);
-  }, [resetGeneration]);
+    window.addEventListener('ids:authentication-required', onUnauthorized);
+    return () => window.removeEventListener('ids:authentication-required', onUnauthorized);
+  }, [authReturn, requestAuthentication, resetGeneration, route]);
 
   useEffect(() => {
     let cancelled = false;
-    void Promise.allSettled([api.health(), api.accessSession()])
-      .then(([healthResult, accessResult]) => {
+    void Promise.allSettled([api.health(), api.authSession()])
+      .then(([healthResult, authResult]) => {
         if (cancelled) return;
         if (healthResult.status === 'fulfilled') setHealth(healthResult.value);
-        if (accessResult.status === 'fulfilled') {
-          setAccess(accessResult.value);
-          if (accessResult.value.authorized) {
+        if (authResult.status === 'fulfilled') {
+          setSession(authResult.value);
+          if (authResult.value.authenticated) {
             void refreshList().catch(() => setError('项目列表暂时无法加载，请稍后重试。'));
           }
         } else {
-          setError('无法确认访问状态，请检查服务连接后重试。');
+          setSession({ authenticated: false, user: null });
+          setError('暂时无法确认登录状态，公开首页和示例仍可正常查看。');
         }
       })
       .finally(() => {
-        if (!cancelled) setAccessChecking(false);
+        if (!cancelled) setSessionChecking(false);
       });
     return () => {
       cancelled = true;
     };
   }, [refreshList]);
+
+  useEffect(() => {
+    if (!creationTransition?.projectId || route.page !== 'workspace' || loading || project?.id !== creationTransition.projectId) return;
+    const timer = window.setTimeout(() => setCreationTransition(undefined), 520);
+    return () => window.clearTimeout(timer);
+  }, [creationTransition, loading, project?.id, route]);
+
+  useEffect(() => {
+    if (sessionChecking || !session) return;
+    if (session.authenticated) {
+      if (route.page === 'auth' && !pendingCreation) navigate(authReturn, true);
+      return;
+    }
+    if (route.page === 'auth' || route.page === 'home') return;
+    if (route.page === 'workspace' && route.projectId === sampleProject.id) return;
+    requestAuthentication(route, 'login', true);
+  }, [authReturn, navigate, pendingCreation, requestAuthentication, route, session, sessionChecking]);
 
   useEffect(() => {
     let cancelled = false;
@@ -151,8 +192,17 @@ export default function App() {
     setError('');
     resetGeneration();
 
+    if (route.page === 'auth') {
+      setProject(undefined);
+      setLoading(false);
+      return () => {
+        cancelled = true;
+        resetGeneration();
+      };
+    }
+
     const isPublicSampleRoute = route.page === 'workspace' && route.projectId === sampleProject.id;
-    if (!isPublicSampleRoute && (!access || (access.required && !access.authorized))) {
+    if (!isPublicSampleRoute && !session?.authenticated) {
       setProject(undefined);
       setLoading(false);
       return () => {
@@ -209,13 +259,18 @@ export default function App() {
       cancelled = true;
       resetGeneration();
     };
-  }, [access, resetGeneration, route, setIdleProgress, watchGeneration]);
+  }, [resetGeneration, route, session?.authenticated, setIdleProgress, watchGeneration]);
 
   const selectProject = useCallback((id: string) => {
     navigate({ page: 'workspace', projectId: id });
   }, [navigate]);
 
   function openCreator(seed = '', mode: CreationMode = 'original', initial?: CreateProjectInput) {
+    if (!session?.authenticated) {
+      const returnTo: ContentRoute = route.page === 'auth' ? { page: 'home' } : route;
+      requestAuthentication(returnTo);
+      return;
+    }
     setCreationSeed(seed);
     setCreationMode(mode);
     setCreationInitial(initial);
@@ -227,9 +282,16 @@ export default function App() {
   }
 
   async function createProject(input: CreateProjectInput) {
+    if (!session?.authenticated) {
+      setPendingCreation(input);
+      requestAuthentication({ page: 'home' });
+      return;
+    }
     setCreating(true);
+    setCreationTransition({ title: input.title, logline: input.logline });
     try {
       const created = await api.createProject(input);
+      setCreationTransition({ title: input.title, logline: input.logline, projectId: created.id });
       setModalOpen(false);
       setCreationInitial(undefined);
       resetGeneration();
@@ -237,16 +299,61 @@ export default function App() {
       void refreshList().catch(() => {
         setError('项目已经创建，但项目列表暂时没有刷新；重新打开页面即可恢复。');
       });
+    } catch (reason) {
+      setCreationTransition(undefined);
+      if (reason instanceof ApiError && reason.status === 401) {
+        setPendingCreation(input);
+        requestAuthentication({ page: 'home' });
+        return;
+      }
+      throw reason;
     } finally {
       setCreating(false);
     }
   }
 
-  async function authorizeAccess(code: string) {
-    const session = await api.authorizeAccess(code);
-    setAccess(session);
+  async function finishAuthentication(nextSession: AuthSession) {
+    if (!nextSession.authenticated || !nextSession.user) throw new Error('服务器未能建立登录会话，请重试。');
+    setSession(nextSession);
     setError('');
-    void refreshList().catch(() => setError('访问已通过，但项目列表暂时无法加载，请稍后重试。'));
+    if (pendingCreation) {
+      setCreating(true);
+      setCreationTransition({ title: pendingCreation.title, logline: pendingCreation.logline });
+      try {
+        const created = await api.createProject(pendingCreation);
+        setCreationTransition({ title: pendingCreation.title, logline: pendingCreation.logline, projectId: created.id });
+        setPendingCreation(undefined);
+        resetGeneration();
+        navigate({ page: 'workspace', projectId: created.id });
+      } catch (reason) {
+        setCreationTransition(undefined);
+        throw new Error(`登录已成功，但创建故事档案失败：${reason instanceof Error ? reason.message : '请稍后重试'}`);
+      } finally {
+        setCreating(false);
+      }
+    } else {
+      navigate(authReturn);
+    }
+    void refreshList().catch(() => setError('已登录，但项目列表暂时无法加载，请稍后重试。'));
+  }
+
+  async function login(identifier: string, password: string) {
+    await finishAuthentication(await api.login(identifier, password));
+  }
+
+  async function register(username: string, password: string, passwordConfirmation: string) {
+    await finishAuthentication(await api.register(username, password, passwordConfirmation));
+  }
+
+  async function logout() {
+    const signedOutSession = await api.logout();
+    setSession(signedOutSession);
+    setProjects([]);
+    setPendingCreation(undefined);
+    resetGeneration();
+    if (route.page === 'trends' || (route.page === 'workspace' && route.projectId !== sampleProject.id)) {
+      navigate({ page: 'home' });
+    }
   }
 
   async function removeProject(id: string) {
@@ -330,24 +437,47 @@ export default function App() {
   }, [health, isSample]);
 
   const isPublicSampleRoute = route.page === 'workspace' && route.projectId === sampleProject.id;
-  if ((accessChecking || !access || (access.required && !access.authorized)) && !isPublicSampleRoute) {
+  const isProtectedRoute = route.page === 'trends' || (route.page === 'workspace' && !isPublicSampleRoute);
+  if (route.page === 'auth' || (isProtectedRoute && (sessionChecking || !session?.authenticated))) {
+    const authMode = route.page === 'auth' ? route.mode : 'login';
+    const returnTo = route.page === 'auth' ? authReturn : route;
     return (
-      <AccessGate
-        checking={accessChecking}
-        onAuthorize={authorizeAccess}
-        onOpenSample={() => navigate({ page: 'workspace', projectId: sampleProject.id })}
+      <AuthPage
+        mode={authMode}
+        checking={sessionChecking}
+        continuation={pendingCreation ? `登录后将继续创建《${pendingCreation.title}》，已填内容不会丢失。` : undefined}
+        onModeChange={(mode) => requestAuthentication(returnTo, mode, true)}
+        onLogin={login}
+        onRegister={register}
+        onOpenHome={() => {
+          setPendingCreation(undefined);
+          navigate({ page: 'home' });
+        }}
+        onOpenSample={() => {
+          setPendingCreation(undefined);
+          navigate({ page: 'workspace', projectId: sampleProject.id });
+        }}
       />
     );
   }
 
   if (route.page === 'home') {
     return (
-      <LandingPage
-        busy={creating}
-        onCreate={createProject}
-        onOpenSample={() => navigate({ page: 'workspace', projectId: sampleProject.id })}
-        onOpenTrends={() => navigate({ page: 'trends' })}
-      />
+      <>
+        <LandingPage
+          busy={creating || sessionChecking}
+          authUser={session?.user}
+          onCreate={createProject}
+          onOpenAuth={() => requestAuthentication({ page: 'home' })}
+          onLogout={logout}
+          onOpenSample={() => navigate({ page: 'workspace', projectId: sampleProject.id })}
+          onOpenTrends={() => {
+            if (session?.authenticated) navigate({ page: 'trends' });
+            else requestAuthentication({ page: 'trends' });
+          }}
+        />
+        {creationTransition && <CreationTransition title={creationTransition.title} logline={creationTransition.logline} visible />}
+      </>
     );
   }
 
@@ -374,12 +504,15 @@ export default function App() {
         <Sidebar
           projects={projects}
           sample={sampleSummary}
+          user={session?.user}
           selectedId={project?.id}
           onHome={() => navigate({ page: 'home' })}
           onSelectSample={() => selectProject(sampleProject.id)}
           onSelect={selectProject}
           onCreate={() => openCreator()}
           onDelete={(id) => void removeProject(id)}
+          onLogin={() => requestAuthentication({ page: 'workspace', projectId: sampleProject.id })}
+          onLogout={() => void logout()}
         />
       </div>
 
@@ -425,7 +558,7 @@ export default function App() {
           <section className="empty-stage">
             <div className="empty-stage-number">PROJECT NOT FOUND</div>
             <h1>这份故事档案<br />已经不在这里了。</h1>
-            <p>匿名项目只保留 7 天。你仍然可以查看完整示例，或从一句新创意重新开始。</p>
+            <p>这份项目可能已按当前保留规则清理。你仍然可以查看完整示例，或从一句新创意重新开始。</p>
             <button className="primary-button" type="button" onClick={() => selectProject(sampleProject.id)}>查看完整示例</button>
           </section>
         )}
@@ -440,6 +573,7 @@ export default function App() {
         onClose={() => !creating && setModalOpen(false)}
         onCreate={createProject}
       />
+      {creationTransition && <CreationTransition title={creationTransition.title} logline={creationTransition.logline} visible />}
     </div>
   );
 }

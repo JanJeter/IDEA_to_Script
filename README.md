@@ -50,7 +50,7 @@ Idea2Screenplay 是面向编剧和内容创作者的全流程 AI 剧本创作工
 | 前端 | React 19、TypeScript、Vite、Lucide |
 | API | NestJS 11、RxJS、REST、SSE、class-validator |
 | 数据库 | PostgreSQL 17、Prisma ORM、pg-boss |
-| AI | OpenAI-compatible Chat Completions、JSON structured output |
+| AI | OpenAI-compatible Chat Completions、JSON structured output、受控 Function Calling Agent |
 | 工程质量 | Jest、Vitest、Testing Library、ESLint |
 | 交付 | npm workspaces、Docker Compose、Caddy |
 
@@ -163,7 +163,11 @@ flowchart LR
   Prisma --> PG[(PostgreSQL)]
   API --> Queue[pg-boss 持久化队列]
   Queue --> Generator[分阶段生成器]
-  Generator --> LLM[OpenAI-compatible LLM]
+  Generator -->|legacy| LLM[OpenAI-compatible LLM]
+  Generator -->|PREMISE 灰度开关| Adapter[Nest Agent 适配器]
+  Adapter --> Agent[apps/agent 单 Agent Runtime]
+  Agent --> Tools[白名单领域工具]
+  Agent --> LLM
   Generator --> Demo[内置 Demo Generator]
 ```
 

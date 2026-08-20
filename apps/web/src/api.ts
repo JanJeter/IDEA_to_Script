@@ -9,7 +9,7 @@ import type {
   StageKey,
   TrendBriefResponse,
   TrendFeed,
-  AccessSession,
+  AuthSession,
 } from './types';
 import type { Challenge, Solution } from 'altcha-lib/types';
 
@@ -34,24 +34,30 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!response.ok) {
     const payload = (await response.json().catch(() => ({}))) as { message?: string | string[] };
     const message = Array.isArray(payload.message) ? payload.message.join('，') : payload.message;
-    if (response.status === 401 && !path.startsWith('/access/') && typeof window !== 'undefined') {
-      window.dispatchEvent(new Event('ids:unauthorized'));
+    if (response.status === 401 && !path.startsWith('/auth/') && typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('ids:authentication-required'));
     }
     throw new ApiError(message ?? `请求失败 (${response.status})`, response.status);
   }
+  if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }
 
 export const api = {
   health: () => request<Health>('/health'),
-  accessSession: () => request<AccessSession>('/access/session'),
-  authorizeAccess: (code: string) =>
-    request<AccessSession>('/access/authorize', {
+  authSession: () => request<AuthSession>('/auth/session'),
+  register: (username: string, password: string, passwordConfirmation: string) =>
+    request<AuthSession>('/auth/register', {
       method: 'POST',
-      headers: { 'X-IDS-Access': 'authorize' },
-      body: JSON.stringify({ code }),
+      body: JSON.stringify({ username, password, passwordConfirmation }),
     }),
-  logoutAccess: () => request<AccessSession>('/access/logout', { method: 'POST' }),
+  login: (identifier: string, password: string) =>
+    request<AuthSession>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ identifier, password }),
+    }),
+  logout: async () => (await request<AuthSession | undefined>('/auth/logout', { method: 'POST' }))
+    ?? { authenticated: false, user: null },
   listTrends: () => request<TrendFeed>('/trends'),
   refreshTrends: () => request<TrendFeed>('/trends/refresh', { method: 'POST' }),
   getTrendBrief: (id: string) => request<TrendBriefResponse>(`/trends/${id}/brief`),

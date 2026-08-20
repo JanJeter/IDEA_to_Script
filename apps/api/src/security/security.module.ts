@@ -1,14 +1,25 @@
 import { Global, Module } from '@nestjs/common';
 import { AbuseProtectionService } from './abuse-protection.service';
-import { AccessController } from './access.controller';
-import { AccessService } from './access.service';
+import { AuthController } from './auth.controller';
+import { AuthNoStoreInterceptor } from './auth-no-store.interceptor';
+import { AuthService } from './auth.service';
+import { AuthThrottleService } from './auth-throttle.service';
+import { PasswordService } from './password.service';
 import { VisitorIdentityService } from './visitor-identity.service';
 import { VisitorMiddleware } from './visitor.middleware';
 
 @Global()
 @Module({
-  controllers: [AccessController],
-  providers: [AbuseProtectionService, AccessService, VisitorIdentityService, VisitorMiddleware],
-  exports: [AbuseProtectionService, VisitorIdentityService, VisitorMiddleware],
+  controllers: [AuthController],
+  providers: [
+    AbuseProtectionService,
+    AuthNoStoreInterceptor,
+    AuthService,
+    AuthThrottleService,
+    PasswordService,
+    VisitorIdentityService,
+    VisitorMiddleware,
+  ],
+  exports: [AbuseProtectionService, AuthService, VisitorMiddleware],
 })
 export class SecurityModule {}

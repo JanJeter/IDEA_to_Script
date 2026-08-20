@@ -58,6 +58,12 @@ const stages: Array<{ id: StageKey; label: string; icon: typeof Sparkles }> = [
 ];
 
 const stageOrder = stages.map(({ id }) => id);
+type UserStageKey = 'STORY' | 'PLAN' | 'SCRIPT';
+const userStages: Array<{ id: UserStageKey; label: string; description: string; icon: typeof Sparkles; stages: StageKey[] }> = [
+  { id: 'STORY', label: '故事设定', description: '创意、人物与场景', icon: Sparkles, stages: ['PREMISE', 'CHARACTERS', 'LOCATIONS'] },
+  { id: 'PLAN', label: '分场计划', description: '节拍与镜头安排', icon: FilePenLine, stages: ['BEATS', 'SCENES'] },
+  { id: 'SCRIPT', label: '完整剧本', description: '对白、动作与导出', icon: ScrollText, stages: ['SCRIPT'] },
+];
 const nextStageLabel: Record<StageKey, string> = {
   PREMISE: '确认并生成人物',
   CHARACTERS: '确认并生成空间',
@@ -139,9 +145,16 @@ export function Studio({
           : '生成故事内核'
         : project.draft.currentStage === 'IDEA'
           ? '重试故事内核'
-          : currentConfirmed
+            : currentConfirmed
             ? '继续下一阶段'
             : '重写当前阶段';
+  const selectedUserStage = userStages.find(({ stages: groupedStages }) => groupedStages.includes(selectedStage)) ?? userStages[0];
+  const selectUserStage = (userStage: UserStageKey) => {
+    const group = userStages.find(({ id }) => id === userStage) ?? userStages[0];
+    const current = group.stages.find((stage) => stage === currentStage);
+    const nextAvailable = group.stages.find((stage) => available(stage));
+    setSelectedStage(current ?? nextAvailable ?? group.stages[0]);
+  };
 
   return (
     <div className="studio">
@@ -184,10 +197,11 @@ export function Studio({
         currentStage={currentStage}
         confirmedStage={confirmedStage}
         selectedStage={selectedStage}
+        selectedUserStage={selectedUserStage.id}
         progress={progress}
         generating={generating}
         available={available}
-        onSelect={setSelectedStage}
+        onSelect={selectUserStage}
       />
 
       {events.length > 0 && generating && (
@@ -199,14 +213,14 @@ export function Studio({
       )}
 
       <div className="workbench">
-        <nav className="view-tabs" aria-label="六阶段编剧工作台">
-          {stages.map(({ id, label, icon: Icon }, index) => (
+        <nav className="view-tabs" aria-label="三阶段编剧工作台">
+          {userStages.map(({ id, label, icon: Icon }, index) => (
             <button
               type="button"
               key={id}
-              className={selectedStage === id ? 'active' : ''}
-              disabled={!available(id)}
-              onClick={() => setSelectedStage(id)}
+              className={selectedUserStage.id === id ? 'active' : ''}
+              disabled={!userStages.find((group) => group.id === id)?.stages.some((stage) => available(stage))}
+              onClick={() => selectUserStage(id)}
             >
               <span className="tab-index">{String(index + 1).padStart(2, '0')}</span>
               <Icon size={16} />
@@ -214,6 +228,19 @@ export function Studio({
             </button>
           ))}
         </nav>
+
+        {selectedUserStage.stages.length > 1 && (
+          <nav className="stage-subtabs" aria-label={`${selectedUserStage.label}内部内容`}>
+            {selectedUserStage.stages.map((id) => {
+              const stage = stages.find((item) => item.id === id)!;
+              return (
+                <button type="button" key={id} className={selectedStage === id ? 'active' : ''} disabled={!available(id)} onClick={() => setSelectedStage(id)}>
+                  {stage.label}
+                </button>
+              );
+            })}
+          </nav>
+        )}
 
         <div className="workbench-content">
           {!available(selectedStage) ? (
@@ -266,6 +293,7 @@ function Pipeline({
   currentStage,
   confirmedStage,
   selectedStage,
+  selectedUserStage,
   progress,
   generating,
   available,
@@ -274,29 +302,32 @@ function Pipeline({
   currentStage?: StageKey | 'IDEA';
   confirmedStage: StageKey | null;
   selectedStage: StageKey;
+  selectedUserStage: UserStageKey;
   progress: number;
   generating: boolean;
   available: (stage: StageKey) => boolean;
-  onSelect: (stage: StageKey) => void;
+  onSelect: (stage: UserStageKey) => void;
 }) {
   const confirmedIndex = confirmedStage ? stageOrder.indexOf(confirmedStage) : -1;
   return (
-    <section className="pipeline" aria-label="生成流水线">
+    <section className="pipeline pipeline--compact" aria-label="三阶段生成流水线">
       <div className="pipeline-rule"><span style={{ width: `${progress}%` }} /></div>
-      {stages.map(({ id, label }, index) => {
-        const complete = confirmedIndex >= index;
-        const active = currentStage === id;
+      {userStages.map(({ id, label, stages: groupedStages }, index) => {
+        const complete = confirmedIndex >= stageOrder.indexOf(groupedStages[groupedStages.length - 1]);
+        const active = groupedStages.includes(currentStage as StageKey);
+        const selected = selectedUserStage === id || groupedStages.includes(selectedStage);
+        const enabled = groupedStages.some((stage) => available(stage));
         return (
           <button
             type="button"
-            className={`pipeline-stage ${complete ? 'complete' : ''} ${active ? 'active' : ''} ${selectedStage === id ? 'selected' : ''}`}
+            className={`pipeline-stage ${complete ? 'complete' : ''} ${active ? 'active' : ''} ${selected ? 'selected' : ''}`}
             key={id}
-            disabled={!available(id)}
+            disabled={!enabled}
             onClick={() => onSelect(id)}
           >
             <span className="stage-dot">{complete ? <Check size={12} /> : index + 1}</span>
             <span>{label}</span>
-            {active && <small>{generating ? '生成中' : complete ? '已确认' : '待确认'}</small>}
+            {active && <small>{generating ? '生成中' : complete ? '已确认' : '进行中'}</small>}
           </button>
         );
       })}
@@ -521,26 +552,10 @@ function StageFields({
   if (stage === 'SCENES') {
     const scenes = (content.scenes ?? []) as ScenePlanDraft[];
     return (
-      <CollectionEditor
-        items={scenes}
-        itemName="场景"
+      <ScenePlanTable
+        scenes={scenes}
         editable={editable}
         onChange={(items) => update('scenes', items)}
-        render={(scene, index, change) => (
-          <>
-            <div className="review-row">
-              <ReviewField label="场景标题" value={scene.heading} editable={editable} onChange={(value) => change({ ...scene, heading: value })} />
-              <ReviewField label="地点" value={scene.location} editable={editable} onChange={(value) => change({ ...scene, location: value })} />
-              <ReviewField label="时间" value={scene.timeOfDay} editable={editable} onChange={(value) => change({ ...scene, timeOfDay: value })} />
-            </div>
-            <ReviewField label="场景意图" value={scene.summary} editable={editable} rows={4} onChange={(value) => change({ ...scene, summary: value })} />
-            <div className="review-row compact-row">
-              <ReviewField label="对应节拍" value={String(scene.beatSequence)} editable={editable} inputMode="numeric" onChange={(value) => change({ ...scene, beatSequence: Number(value) || 1 })} />
-              <ReviewField label="预计秒数" value={String(scene.estimatedSeconds)} editable={editable} inputMode="numeric" onChange={(value) => change({ ...scene, estimatedSeconds: Number(value) || 60 })} />
-            </div>
-            <span className="collection-folio">{String(index + 1).padStart(2, '0')}</span>
-          </>
-        )}
       />
     );
   }
@@ -666,6 +681,107 @@ function CollectionEditor<Item>({
           })}
         </article>
       ))}
+    </div>
+  );
+}
+
+function ScenePlanTable({
+  scenes,
+  editable,
+  onChange,
+}: {
+  scenes: ScenePlanDraft[];
+  editable: boolean;
+  onChange: (scenes: ScenePlanDraft[]) => void;
+}) {
+  function update(index: number, patch: Partial<ScenePlanDraft>) {
+    if (!editable) return;
+    onChange(scenes.map((scene, sceneIndex) => sceneIndex === index ? { ...scene, ...patch } : scene));
+  }
+
+  return (
+    <div className="scene-plan-table-wrap">
+      <div className="scene-plan-table-meta">
+        <div>
+          <strong>分场计划</strong>
+          <span>{scenes.length} 个镜头 · 按顺序确认画面节奏</span>
+        </div>
+        <span>{editable ? '点击单元格直接修改' : '只读示例'}</span>
+      </div>
+      <div className="scene-plan-table-scroll">
+        <table className="scene-plan-table">
+          <thead>
+            <tr>
+              <th scope="col">镜号</th>
+              <th scope="col">时长</th>
+              <th scope="col">画面与动作</th>
+              <th scope="col">场景信息</th>
+            </tr>
+          </thead>
+          <tbody>
+            {scenes.map((scene, index) => (
+              <tr key={`${scene.sceneNumber}-${index}`}>
+                <th scope="row">E{String(scene.beatSequence).padStart(2, '0')}S{String(scene.sceneNumber).padStart(2, '0')}</th>
+                <td>
+                  {editable ? (
+                    <input
+                      className="scene-plan-duration"
+                      aria-label={`第 ${index + 1} 个镜头时长`}
+                      inputMode="numeric"
+                      value={scene.estimatedSeconds}
+                      onChange={(event) => update(index, { estimatedSeconds: Number(event.target.value) || 0 })}
+                    />
+                  ) : scene.estimatedSeconds}
+                  <span className="scene-plan-unit">s</span>
+                </td>
+                <td className="scene-plan-description">
+                  {editable ? (
+                    <>
+                      <input
+                        aria-label={`第 ${index + 1} 个镜头标题`}
+                        value={scene.heading}
+                        onChange={(event) => update(index, { heading: event.target.value })}
+                      />
+                      <textarea
+                        aria-label={`第 ${index + 1} 个镜头画面描述`}
+                        rows={3}
+                        value={scene.summary}
+                        onChange={(event) => update(index, { summary: event.target.value })}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <strong>{scene.heading}</strong>
+                      <p>{scene.summary}</p>
+                    </>
+                  )}
+                </td>
+                <td className="scene-plan-context">
+                  {editable ? (
+                    <>
+                      <input
+                        aria-label={`第 ${index + 1} 个镜头地点`}
+                        value={scene.location}
+                        onChange={(event) => update(index, { location: event.target.value })}
+                      />
+                      <input
+                        aria-label={`第 ${index + 1} 个镜头时间`}
+                        value={scene.timeOfDay}
+                        onChange={(event) => update(index, { timeOfDay: event.target.value })}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <strong>{scene.location}</strong>
+                      <span>{scene.timeOfDay}</span>
+                    </>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

@@ -113,4 +113,22 @@ describe('useGenerationJob', () => {
     expect(api.getGenerationJob).toHaveBeenCalledTimes(1);
     expect(onFailed).toHaveBeenCalledWith('生成任务已不存在或无权访问');
   });
+
+  it('explains that a 401 requires signing in again', async () => {
+    vi.useFakeTimers();
+    const onFailed = vi.fn();
+    vi.mocked(api.getGenerationJob).mockRejectedValue(Object.assign(new Error('unauthorized'), { status: 401 }));
+    const { result } = renderHook(() =>
+      useGenerationJob({ onSucceeded: vi.fn(), onFailed }),
+    );
+
+    act(() => result.current.watch(job));
+    act(() => FakeEventSource.instances[0].onerror?.(new Event('error')));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_500);
+      await Promise.resolve();
+    });
+
+    expect(onFailed).toHaveBeenCalledWith('登录状态已失效，请重新登录');
+  });
 });

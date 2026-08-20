@@ -1,15 +1,18 @@
-import { Check, Clapperboard, Film, Home, Plus, Trash2 } from 'lucide-react';
-import type { ProjectSummary } from '../types';
+import { Check, Clapperboard, Film, Home, LogIn, LogOut, Plus, Trash2, UserRound } from 'lucide-react';
+import type { AuthUser, ProjectSummary } from '../types';
 
 type Props = {
   projects: ProjectSummary[];
   sample: ProjectSummary;
+  user?: AuthUser | null;
   selectedId?: string;
   onHome: () => void;
   onSelectSample: () => void;
   onSelect: (id: string) => void;
   onCreate: () => void;
   onDelete: (id: string) => void;
+  onLogin: () => void;
+  onLogout: () => void;
 };
 
 const statusText = {
@@ -20,7 +23,19 @@ const statusText = {
   FAILED: '需重试',
 } as const;
 
-export function Sidebar({ projects, sample, selectedId, onHome, onSelectSample, onSelect, onCreate, onDelete }: Props) {
+export function Sidebar({
+  projects,
+  sample,
+  user,
+  selectedId,
+  onHome,
+  onSelectSample,
+  onSelect,
+  onCreate,
+  onDelete,
+  onLogin,
+  onLogout,
+}: Props) {
   return (
     <aside className="sidebar">
       <button className="brand-lockup" type="button" onClick={onHome} aria-label="返回首页">
@@ -92,10 +107,16 @@ export function Sidebar({ projects, sample, selectedId, onHome, onSelectSample, 
         <span>新建故事</span>
       </button>
 
-      <div className="sidebar-footer">
-        <span>ANONYMOUS</span>
-        <span>保留 7 天</span>
-      </div>
+      {user ? (
+        <div className="sidebar-footer sidebar-account">
+          <span className="sidebar-account-name"><UserRound size={14} /><b>{user.username}</b></span>
+          <button type="button" onClick={onLogout} aria-label="退出登录"><LogOut size={14} />退出</button>
+        </div>
+      ) : (
+        <button className="sidebar-footer sidebar-login" type="button" onClick={onLogin}>
+          <span><LogIn size={14} />登录后开始创作</span>
+        </button>
+      )}
     </aside>
   );
 }
