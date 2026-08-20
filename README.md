@@ -1,58 +1,80 @@
 # Idea2Screenplay
 
-一句创意，逐层发展为人物、世界、三幕节拍、分场和完整剧本的 AI 编剧工作台。
+> 一句话创意，逐层发展为人物、世界、三幕节拍、分场和完整剧本的 AI 编剧工作台。
 
-项目借鉴 [Dramatron](https://github.com/google-deepmind/dramatron) 的分层故事生成思想，使用现代 Web 技术重新实现：前端为 React，后端为 NestJS，数据持久化到 PostgreSQL。代码没有复制 Dramatron 实现。
+Idea2Screenplay 是面向编剧和内容创作者的全流程 AI 剧本创作工具。它把故事拆成可审阅、可编辑、可回退的阶段，让 AI 负责发散，人类保留创作决策权。
 
-## 为什么不是“一次 Prompt 写完”
+![Idea2Screenplay 完整剧本工作台](artifacts/character-profiles.png)
 
-完整剧本直接生成容易出现人物动机漂移、场景重复和前后矛盾。本项目把创作拆成六个有依赖关系、可追踪的阶段：
+## 项目概览
 
 ```text
-故事种子 → 前提/主题 → 人物 → 空间 → 三幕节拍 → 分场 → 动作与对白
+故事内核 → 人物档案 → 场景空间 → 情节节拍 → 分场计划 → 完整剧本
 ```
 
-每个阶段单独调用模型、验证结构化 JSON、写入暂存版本并通过 SSE 推送进度。用户可以审阅、编辑、保存或局部重生成当前阶段，明确确认后才会进入下一阶段；完整剧本最终确认前不会替换已有成功稿。
+每个阶段生成结构化草稿，并通过 SSE 推送进度。用户可以审阅、编辑、保存、局部重生成和确认；确认当前阶段后，系统才会继续下一阶段。
 
-## 已实现功能
+## 核心能力
 
-- 一句话创意建档，支持类型、气质、语言和目标时长
-- 面向 100 人私测的访问码门禁，支持原创短剧与最多 10,000 字网文素材
-- 社会热点选题台：持久化公开注意力快照，保留来源与风险状态，并转成脱敏的 AIScript 创作提示词
-- 不依赖 API 与数据库的固定完整示例 `/workspace/sample`
-- 六阶段层级式剧本生成，每阶段可编辑、保存、局部重生成并确认后继续
-- OpenAI-compatible 模型接口，可连接 OpenAI、OpenRouter、Ollama 等兼容服务
-- 无 API Key 演示模式，开箱即可跑完整流程
-- PostgreSQL 持久化人物、地点、节拍、场景和生成记录
-- 一人一码的私测准入、HttpOnly 签名身份与项目所有权隔离
-- ALTCHA 工作量证明、访客/IP/全站额度、月度熔断和单并发保护
-- PostgreSQL + pg-boss 持久化生成任务、有限重试和 Job 状态查询
-- SSE 实时生成进度，断线后自动轮询恢复，刷新页面可重新连接活跃任务
-- 匿名项目固定保留 7 天，过期后立即停止访问并由每日持久化任务自动清理
-- 三幕结构看板与人物档案
-- 逐场编辑与保存
-- Fountain 标准文本汇编、复制与下载
-- 响应式“编剧室”界面
-- Docker 本地数据库与生产容器配置
+- 一句话创意建档：类型、气质、语言、目标时长和原创/改编模式
+- 六阶段剧本生成：故事内核、人物、空间、节拍、分场、完整剧本
+- 人物档案与人物关系图谱，支持桌面端和移动端
+- 社会热点选题台：将公开热点转译为脱敏创作 Brief
+- 支持原创短剧和最多 10,000 字网文素材
+- 每阶段可编辑、保存、局部重生成并确认后继续
+- OpenAI-compatible 模型接口，可接入 OpenAI、OpenRouter、Ollama
+- 内置 Demo 模式，无 API Key 也能完整体验
+- PostgreSQL 持久化项目、人物、地点、节拍、场景和生成记录
+- SSE 实时进度、断线轮询恢复、Fountain 文本复制与下载
+- 账号密码认证、服务端会话、项目隔离、生成额度控制
+- Docker Compose 本地开发及生产部署方案
+
+## 产品截图
+
+### 完整剧本与 Fountain 导出
+
+![完整剧本与 Fountain 导出](artifacts/character-profiles.png)
+
+### 人物关系图谱
+
+![人物关系图谱 - 桌面端](artifacts/character-graph-desktop.png)
+
+### 响应式移动端界面
+
+![人物关系图谱 - 移动端](artifacts/character-graph-mobile.png)
 
 ## 技术栈
 
-| 层 | 技术 |
-|---|---|
-| Web | React 19、TypeScript、Vite、Lucide |
-| API | NestJS 11、RxJS、SSE、class-validator |
-| Database | PostgreSQL 17、Prisma ORM |
-| LLM | OpenAI-compatible Chat Completions、JSON structured output |
-| Quality | Jest、Vitest、Testing Library、ESLint |
-| Delivery | npm workspaces、Docker Compose、Caddy |
+| 层级 | 技术 |
+| --- | --- |
+| 前端 | React 19、TypeScript、Vite、Lucide |
+| API | NestJS 11、RxJS、REST、SSE、class-validator |
+| 数据库 | PostgreSQL 17、Prisma ORM、pg-boss |
+| AI | OpenAI-compatible Chat Completions、JSON structured output |
+| 工程质量 | Jest、Vitest、Testing Library、ESLint |
+| 交付 | npm workspaces、Docker Compose、Caddy |
 
-## 本地启动
+## 项目结构
 
-要求：Node.js 22.12+、Docker。
+```text
+apps/
+├── web/       React 编剧工作台
+├── api/       NestJS API、Prisma Schema、生成流水线
+└── agent/     受控 Agent Runtime 与剧本生成能力
+docs/          架构、部署、安全和产品设计文档
+artifacts/     README 展示截图
+scripts/       PostgreSQL 备份、恢复与验收脚本
+```
 
-Windows 可以直接双击根目录的 `start-dev.cmd`。脚本会检查运行环境、启动 Docker Desktop 和 PostgreSQL、创建缺失的 `.env`、安装依赖、执行数据库迁移，并在前后端就绪后打开浏览器；已有 `.env` 不会被覆盖。
+## 快速开始
 
-也可以在终端中手动启动：
+环境要求：Node.js `22.12+`、Docker Desktop / Docker Engine、npm。
+
+### Windows 一键启动
+
+在项目根目录双击 `start-dev.cmd`。脚本会检查环境、启动 PostgreSQL、创建 `.env`、安装依赖、执行 Prisma 迁移并启动前后端。
+
+### 手动启动
 
 ```bash
 npm install
@@ -63,18 +85,13 @@ npm run db:migrate
 npm run dev
 ```
 
-PowerShell 可使用 `Copy-Item .env.example .env` 代替 `cp`。
+PowerShell 可使用 `Copy-Item .env.example .env`。启动后访问：
 
-打开：
+- Web：<http://localhost:5173>
+- API 健康检查：<http://localhost:3000/api/health>
+- 固定完整示例：<http://localhost:5173/workspace/sample>
 
-- Web: <http://localhost:5173>
-- API health: <http://localhost:3000/api/health>
-
-`.env.example` 默认使用 `DEMO_MODE=true`；复制为 `.env` 后不会调用外部模型。
-
-热点选题台默认只启用免费的 Wikimedia 中文站每日热门弱信号。可选官方来源包括百度千帆“百度热搜”、微博商业热搜榜、X API v2 地区趋势，以及 YouTube 热门音乐/电影/游戏发现源；没有对应凭证/批准开关时自动禁用。系统不抓平台网页，也不把 X Post、YouTube 描述/频道/评论、微博博文/账号/评论或原始热点标题发送给剧本模型。X 与 YouTube 因多语言和用途授权边界默认进入 REVIEW，只能监控和预览脱敏 Brief；微博还要求显式确认商业合同已经覆盖当前用途。旧百度 `trending_lists` 接口已经下架且未被使用。配置、成本和合规边界见 [`docs/TREND_MONITORING.md`](docs/TREND_MONITORING.md)。
-
-需要在本机持续进行不限额测试时，可以在 `.env` 中设置 `LOCAL_UNLIMITED_MODE=true`。该模式仅跳过本地开发环境的项目数、局部重生成次数、挑战频率和访客/IP/全站生成额度；匿名所有权、ALTCHA 验证、持久化队列和生成并发保护仍然生效。生产环境检测到该开关会拒绝启动。
+默认 `.env.example` 使用 `DEMO_MODE=true`，不会调用外部模型或产生模型费用。
 
 ## 接入真实模型
 
@@ -87,56 +104,82 @@ LLM_MODEL=gpt-4.1-mini
 DEMO_MODE=false
 ```
 
-兼容服务需实现 `POST /chat/completions`。系统会先尝试 `response_format: { type: "json_object" }`；不支持时自动去掉该参数重试。
+兼容服务需要提供 `POST /chat/completions`。项目会优先请求 JSON structured output；不支持时自动降级重试。真实模型调用会产生服务商费用，请同时设置预算和限额。
 
-### PREMISE Agent 灰度模式
+## 生产部署
 
-项目包含一个默认关闭的受控 AgentRuntime 纵向切片。只有确认模型供应商支持 OpenAI-compatible tool calls 后才应启用：
+项目提供 Docker Compose + Caddy 生产配置，适合带固定公网 IPv4 的 Linux 云服务器。
 
-```dotenv
-DEMO_MODE=false
-GENERATION_RUNTIME=agent
-AGENT_ENABLED_STAGES=PREMISE
-AGENT_PREMISE_MAX_STEPS=4
-AGENT_PREMISE_TOKEN_BUDGET=16000
-AGENT_TIMEOUT_MS=90000
+```bash
+cp .env.example .env.production
 ```
 
-Agent 仅拥有 `validate_premise_draft` 和 `submit_premise_draft` 两个 Run-scoped 工具；没有 Bash、文件、MCP、Cron 或 Sub-Agent 权限。其他五个阶段继续使用原有 JSON 生成器。默认 `GENERATION_RUNTIME=legacy`。
+编辑 `.env.production`，至少配置：
 
-## 固定公网 IP 生产部署
+```dotenv
+NODE_ENV=production
+PUBLIC_IP=你的公网IPv4
+POSTGRES_PASSWORD=强密码
+COOKIE_SIGNING_KEY=随机长字符串
+VISITOR_IDENTITY_KEY=随机长字符串
+IP_HASH_KEY=随机长字符串
+ALTCHA_HMAC_KEY=随机长字符串
+AUTH_THROTTLE_KEY=随机长字符串
+DEMO_MODE=true
+```
 
-生产容器已改为 Node.js 24、Caddy、NestJS 与 PostgreSQL 17，通过一个固定公网 IP 提供服务。首次部署需要先以 HTTP bootstrap 模式启动，再使用 Certbot 5.4+ 签发短期 IP 地址证书并切换到 HTTPS。
+可用 `openssl rand -hex 32` 生成密钥。`.env.production` 只用于服务器运行时注入，禁止提交到 Git/Gitee。
 
-完整命令见 [`docs/IP_DEPLOYMENT.md`](docs/IP_DEPLOYMENT.md)。架构与预算说明见 [`docs/PRODUCTION_ARCHITECTURE.md`](docs/PRODUCTION_ARCHITECTURE.md)。
+首次部署：安装 Docker → 开放 80/443 → 使用 bootstrap 配置启动 → 用 Certbot 签发 HTTPS → 切换正式 HTTPS 配置 → 验证健康检查和登录流程。
 
-生产 Compose 强制开启访问码门禁。部署前运行 `npm run access-codes:generate -- 100`，把输出写入服务器 `.env.production`，并为每位私测用户单独分发一个码；详细行为与额度见 [`docs/P1-ACCESS-QUOTA-CONTROL.md`](docs/P1-ACCESS-QUOTA-CONTROL.md)。生产环境文件只用于 Compose 运行时注入，构建上下文隔离与旧缓存处置见 [`docs/P1-DOCKER-BUILD-SECRET-ISOLATION.md`](docs/P1-DOCKER-BUILD-SECRET-ISOLATION.md)。
+正式启动：
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+docker compose --env-file .env.production -f docker-compose.prod.yml ps
+docker compose --env-file .env.production -f docker-compose.prod.yml logs --tail=100 api web
+```
+
+详细文档：[`docs/ALIYUN_DEPLOYMENT.md`](docs/ALIYUN_DEPLOYMENT.md)、[`docs/IP_DEPLOYMENT.md`](docs/IP_DEPLOYMENT.md)、[`docs/P2-DATABASE-BACKUP-RESTORE.md`](docs/P2-DATABASE-BACKUP-RESTORE.md)。
 
 ## 常用命令
 
 ```bash
-npm run build       # 前后端生产构建
-npm run test        # Jest + Vitest
-npm run lint        # ESLint
-npm run access-codes:generate -- 100  # 生成 100 个生产访问码
-npm run db:migrate:dev -- --name your_change  # 开发新迁移
-npm run db:studio   # Prisma Studio
+npm run dev          # 启动 API 与 Web
+npm run build        # 构建 Agent、API 和 Web
+npm run test         # 执行全部测试
+npm run lint         # 执行 ESLint
+npm run db:generate  # 生成 Prisma Client
+npm run db:migrate   # 执行数据库迁移
+npm run db:studio    # 打开 Prisma Studio
 ```
 
-## 目录
+## 架构简图
 
-```text
-apps/
-  api/              NestJS API、Prisma schema、生成流水线
-  web/              React 编剧工作台
-docs/
-  ARCHITECTURE.md   领域模型与生成协议
-  UX_BLUEPRINT.md   已确认的信息架构与低保真交互
-  PRODUCTION_ARCHITECTURE.md  生产架构与成本边界
-  IP_DEPLOYMENT.md  无域名、固定公网 IP 上线手册
-  TREND_MONITORING.md  外部热点来源、监听配置与 AIScript 安全转译
+```mermaid
+flowchart LR
+  Web[React Web] -->|REST / SSE| API[NestJS API]
+  API --> Prisma[Prisma ORM]
+  Prisma --> PG[(PostgreSQL)]
+  API --> Queue[pg-boss 持久化队列]
+  Queue --> Generator[分阶段生成器]
+  Generator --> LLM[OpenAI-compatible LLM]
+  Generator --> Demo[内置 Demo Generator]
 ```
+
+详细领域模型请查看 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。
+
+## 设计原则
+
+- AI 生成的是可编辑草稿，而不是不可追溯的最终答案。
+- 每一阶段都可观察、可修改、可重试，确认后才向下游传播。
+- 生成任务持久化，SSE 断线后可以轮询恢复。
+- 默认 Demo 模式优先保证低成本、可复现的产品演示。
 
 ## 重要说明
 
-AI 输出应被视为供人类编剧编辑的草稿。匿名身份、项目隔离、生成限额、Token 成本上限，以及热点输入的风险分级与生成前复核已由服务端强制执行；正式上线前仍应补充针对模型输出的真人实体、原热点措辞重合和高风险内容扫描。
+AI 输出应被视为供人类编剧编辑的草稿。正式上线前，建议补充真人实体、热点原文重合、高风险内容和版权风险扫描，并在模型服务商侧配置独立费用上限。
+
+## License
+
+本项目采用 [MIT License](LICENSE)。
