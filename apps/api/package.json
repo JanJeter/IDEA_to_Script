@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "2.0.44",
+    "@idea2screenplay/agent": "0.1.0",
     "@nestjs/common": "^11.1.6",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.6",
