@@ -18,7 +18,10 @@
   overflow-x: hidden;
   color: var(--landing-ink);
   background: var(--landing-bg);
-  font-family: "Noto Sans SC Variable", "Microsoft YaHei", "PingFang SC", "Inter", sans-serif;
+  /* Keep Chinese UI copy on a real installed font. The old variable-font name
+     was not shipped, so browsers synthesized the 550 weight and made input
+     text look unnaturally heavy. */
+  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", "Inter", sans-serif;
   font-size: 16px;
   font-weight: 500;
 }
@@ -229,10 +232,11 @@
 
 .hero-copy h1 {
   margin: 22px 0 24px;
-  font-size: clamp(3.1rem, 6.1vw, 5.25rem);
-  font-weight: 750;
-  line-height: 1.13;
-  letter-spacing: -.035em;
+  max-width: 780px;
+  font-size: clamp(3rem, 5.2vw, 4.75rem);
+  font-weight: 700;
+  line-height: 1.16;
+  letter-spacing: -.025em;
   text-wrap: balance;
   animation: hero-enter 480ms 170ms var(--landing-ease) both;
 }
@@ -271,8 +275,8 @@
 }
 
 .idea-composer {
-  width: min(880px, 100%);
-  margin-top: 46px;
+  width: min(820px, 100%);
+  margin-top: 42px;
   overflow: hidden;
   background: var(--landing-surface);
   border: 1px solid var(--landing-line-strong);
@@ -342,9 +346,9 @@
 .composer-main {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 20px;
+  gap: 24px;
   align-items: end;
-  padding: 24px;
+  padding: 26px 28px 22px;
 }
 
 .composer-input {
@@ -362,16 +366,18 @@
 
 .composer-input textarea {
   width: 100%;
-  min-height: 80px;
-  padding: 0;
+  min-height: 92px;
+  padding: 2px 0 0;
   color: var(--landing-ink);
   background: transparent;
   border: 0;
   outline: 0;
   resize: vertical;
-  font-size: 1.0625rem;
-  font-weight: 550;
-  line-height: 1.7;
+  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.75;
+  letter-spacing: .01em;
 }
 
 .composer-input textarea::placeholder,
@@ -387,7 +393,7 @@
 .composer-continue {
   display: inline-flex;
   min-width: 112px;
-  min-height: 48px;
+  min-height: 46px;
   align-items: center;
   justify-content: center;
   gap: 8px;
@@ -395,7 +401,7 @@
   color: #fff;
   background: var(--landing-accent);
   border: 0;
-  border-radius: 8px;
+  border-radius: 7px;
   font-size: .875rem;
   font-weight: 750;
   cursor: pointer;
@@ -417,7 +423,7 @@
   display: flex;
   justify-content: space-between;
   gap: 20px;
-  padding: 0 0 20px;
+  padding: 0 0 22px;
   color: var(--landing-muted);
   font-size: .8125rem;
   font-weight: 600;
@@ -1351,8 +1357,8 @@
     width: 100%;
     max-width: none;
     margin-top: 18px;
-    font-size: clamp(2.8rem, 13vw, 4.2rem);
-    line-height: 1.12;
+    font-size: clamp(2.7rem, 12vw, 4rem);
+    line-height: 1.16;
     overflow-wrap: anywhere;
   }
 
@@ -1389,7 +1395,7 @@
 
   .composer-input textarea {
     min-height: 96px;
-    font-size: 1rem;
+    font-size: .9375rem;
   }
 
   .composer-continue {

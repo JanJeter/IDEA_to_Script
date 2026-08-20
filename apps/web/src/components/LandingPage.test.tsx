@@ -334,7 +334,8 @@ describe('LandingPage', () => {
     );
     const reducedMotionCss = landingCss.slice(landingCss.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
 
-    expect(landingCss).toContain('"Noto Sans SC Variable"');
+    expect(landingCss).toContain('"PingFang SC"');
+    expect(landingCss).not.toContain('"Noto Sans SC Variable"');
     expect(landingCss).not.toContain('.scroll-reveal');
     expect(artifactBaseRule).not.toMatch(/opacity|visibility|display|transform/);
     expect(copyBaseRule).not.toMatch(/opacity|visibility|display|transform/);
