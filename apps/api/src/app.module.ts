@@ -28,9 +28,7 @@ export class AppModule implements NestModule {
         { path: 'health', method: RequestMethod.GET },
         { path: 'health/live', method: RequestMethod.GET },
         { path: 'health/ready', method: RequestMethod.GET },
-        { path: 'access/session', method: RequestMethod.GET },
-        { path: 'access/authorize', method: RequestMethod.POST },
-        { path: 'access/logout', method: RequestMethod.POST },
+        { path: 'auth/{*path}', method: RequestMethod.ALL },
       )
       .forRoutes({ path: '{*path}', method: RequestMethod.ALL });
   }

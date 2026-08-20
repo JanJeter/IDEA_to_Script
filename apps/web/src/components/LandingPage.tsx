@@ -17,16 +17,20 @@ import {
   Save,
   ShieldCheck,
   Sparkles,
+  UserRound,
   Users,
 } from 'lucide-react';
-import type { CreateProjectInput } from '../types';
+import type { AuthUser, CreateProjectInput } from '../types';
 import './LandingPage.css';
 
 type CreationMode = 'original' | 'adaptation';
 
 type Props = {
   busy?: boolean;
+  authUser?: AuthUser | null;
   onCreate: (input: CreateProjectInput) => Promise<void>;
+  onOpenAuth: () => void;
+  onLogout: () => Promise<void>;
   onOpenSample: () => void;
   onOpenTrends: () => void;
 };
@@ -189,7 +193,15 @@ function Finale({ onStart, onOpenSample }: { onStart: () => void; onOpenSample: 
   );
 }
 
-export function LandingPage({ busy = false, onCreate, onOpenSample, onOpenTrends }: Props) {
+export function LandingPage({
+  busy = false,
+  authUser,
+  onCreate,
+  onOpenAuth,
+  onLogout,
+  onOpenSample,
+  onOpenTrends,
+}: Props) {
   const [mode, setMode] = useState<CreationMode>('original');
   const [seed, setSeed] = useState('');
   const [hasAdaptationRights, setHasAdaptationRights] = useState(false);
@@ -357,7 +369,18 @@ export function LandingPage({ busy = false, onCreate, onOpenSample, onOpenTrends
           <button type="button" onClick={onOpenTrends}>热点选题</button>
           <button type="button" onClick={onOpenSample}>完整示例</button>
         </nav>
-        <button className="nav-start" type="button" onClick={focusComposer}>开始写故事</button>
+        <div className="landing-session-actions">
+          {authUser ? (
+            <div className="landing-user" title={`已登录：${authUser.username}`}>
+              <UserRound size={15} />
+              <span>{authUser.username}</span>
+              <button type="button" onClick={() => void onLogout()}>退出</button>
+            </div>
+          ) : (
+            <button className="nav-login" type="button" onClick={onOpenAuth}>登录 / 注册</button>
+          )}
+          <button className="nav-start" type="button" onClick={focusComposer}>开始写故事</button>
+        </div>
       </header>
 
       <main id="main-content" tabIndex={-1}>
@@ -447,7 +470,7 @@ export function LandingPage({ busy = false, onCreate, onOpenSample, onOpenTrends
 
             <div className="composer-meta" id="composer-help">
               <span>至少 {minimumLength} 字，当前 {seed.length.toLocaleString()} / {maximumLength.toLocaleString()}</span>
-              <span>匿名项目保留 7 天</span>
+              <span>{authUser ? '创建后归入你的创作账号' : '创建前需登录或注册'}</span>
             </div>
 
             {setupOpen && (
@@ -612,7 +635,7 @@ export function LandingPage({ busy = false, onCreate, onOpenSample, onOpenTrends
 
       <footer className="landing-footer">
         <div><strong>Idea to Screenplay</strong><span>给中文短剧创作者的分阶段写作工具</span></div>
-        <p>匿名项目保留 7 天。AI 输出请在发布或拍摄前人工审阅。</p>
+        <p>项目归在你的创作账号下，并按当前保留规则管理。AI 输出请在发布或拍摄前人工审阅。</p>
         <div><Sparkles size={15} /><span>作品重于界面，决定始终由你完成。</span></div>
       </footer>
     </div>

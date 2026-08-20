@@ -6,7 +6,9 @@ import {
   ProjectStatus,
   RunStatus,
 } from '@prisma/client';
+import { AgentExecutionError } from '@idea2screenplay/agent';
 import { GenerationService } from './generation.service';
+import { NonRetryableGenerationError } from './generation-error';
 import { type LlmCallTelemetry, LlmRequestError } from './llm.service';
 
 const timestamp = new Date('2026-08-08T00:00:00.000Z');
@@ -773,10 +775,14 @@ describe('GenerationService staged workflow', () => {
         draft: premise,
         telemetry: {
           finishReason: 'submitted',
-          steps: 2,
-          toolCalls: 2,
-          promptTokens: 140,
-          completionTokens: 80,
+           steps: 2,
+           toolCalls: 2,
+           providerCalls: 3,
+           retries: 1,
+           promptTokens: 140,
+           completionTokens: 80,
+           cachedInputTokens: 0,
+           providerDurationMs: 640,
         },
       }),
     };
@@ -809,8 +815,46 @@ describe('GenerationService staged workflow', () => {
     );
     expect(prisma.transaction.generationRun.update).toHaveBeenCalledWith({
       where: { id: 'run-1' },
-      data: expect.objectContaining({ promptTokens: 140, completionTokens: 80 }),
+      data: expect.objectContaining({
+        providerCallCount: 3,
+        providerDurationMs: 640,
+        promptTokens: 140,
+        completionTokens: 80,
+      }),
     });
+  });
+
+  it('does not multiply pg-boss retries after the Agent Harness exhausts its budget', async () => {
+    const prisma = stagePrisma();
+    const llm = { model: 'test-model', generateJson: jest.fn() };
+    const premiseAgent = {
+      enabled: true,
+      generate: jest.fn().mockRejectedValue(
+        new AgentExecutionError('provider attempts exhausted', 'retry_budget_exhausted'),
+      ),
+    };
+    const service = new GenerationService(
+      prisma as never,
+      llm as never,
+      {} as never,
+      premiseAgent as never,
+    );
+
+    await expect(service.executeStage(
+      'project-1',
+      'visitor-1',
+      'job-1',
+      'version-1',
+      'PREMISE',
+      jest.fn().mockResolvedValue(undefined),
+      jest.fn().mockResolvedValue(undefined),
+      1,
+    )).rejects.toMatchObject<Partial<NonRetryableGenerationError>>({
+      kind: 'agent_run',
+      retryable: false,
+      message: 'Agent 已达到本次生成预算上限，请重试',
+    });
+    expect(llm.generateJson).not.toHaveBeenCalled();
   });
 
   it('keeps confirmed stage content when the next stage fails', async () => {

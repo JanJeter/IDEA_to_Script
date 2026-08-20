@@ -1,4 +1,7 @@
-export type NonRetryableGenerationFailureKind = 'invalid_output' | 'result_persistence';
+export type NonRetryableGenerationFailureKind =
+  | 'invalid_output'
+  | 'result_persistence'
+  | 'agent_run';
 
 /**
  * Marks a generation failure that must not be returned to pg-boss for an

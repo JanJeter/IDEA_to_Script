@@ -32,9 +32,12 @@ services:
       VISITOR_IDENTITY_KEY: ${RESTORE_VISITOR_IDENTITY_KEY:?Set a different restore-only random key}
       IP_HASH_KEY: ${RESTORE_IP_HASH_KEY:?Set a different restore-only random key}
       ALTCHA_HMAC_KEY: ${RESTORE_ALTCHA_HMAC_KEY:?Set a different restore-only random key}
-      VISITOR_COOKIE_SECURE: "true"
-      ACCESS_CONTROL_REQUIRED: "true"
-      APP_ACCESS_CODES: ${RESTORE_APP_ACCESS_CODE:?Set a restore-only access code}
+      AUTH_THROTTLE_KEY: ${RESTORE_AUTH_THROTTLE_KEY:?Set a different restore-only random key}
+      AUTH_COOKIE_SECURE: "true"
+      AUTH_SESSION_DAYS: 1
+      AUTH_PASSWORD_CONCURRENCY: 2
+      AUTH_PASSWORD_QUEUE_MAX: 4
+      APP_ACCESS_CODES: ""
       DEMO_MODE: "true"
       LLM_API_KEY: ""
       RESTORE_VERIFY_MODE: "true"

@@ -13,16 +13,20 @@ function renderLanding(overrides: Partial<ComponentProps<typeof LandingPage>> = 
   const onCreate = vi.fn(async (input: CreateProjectInput) => {
     void input;
   });
+  const onOpenAuth = vi.fn();
+  const onLogout = vi.fn(async () => undefined);
   const onOpenSample = vi.fn();
   const onOpenTrends = vi.fn();
   const props: ComponentProps<typeof LandingPage> = {
     onCreate,
+    onOpenAuth,
+    onLogout,
     onOpenSample,
     onOpenTrends,
     ...overrides,
   };
 
-  return { ...render(<LandingPage {...props} />), onCreate, onOpenSample, onOpenTrends };
+  return { ...render(<LandingPage {...props} />), onCreate, onOpenAuth, onLogout, onOpenSample, onOpenTrends };
 }
 
 function enterOriginalSeed() {
@@ -229,6 +233,19 @@ describe('LandingPage', () => {
     const sample = screen.getByRole('article', { name: '《零点十七分》完整示例预览' });
     expect(within(sample).getByRole('button', { name: '打开完整示例' })).toBeInTheDocument();
     expect(within(screen.getByRole('contentinfo')).queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('offers authentication publicly and exposes the signed-in account', async () => {
+    const { unmount, onOpenAuth } = renderLanding();
+    fireEvent.click(screen.getByRole('button', { name: '登录 / 注册' }));
+    expect(onOpenAuth).toHaveBeenCalledOnce();
+    unmount();
+
+    const onLogout = vi.fn(async () => undefined);
+    renderLanding({ authUser: { id: 'user-1', username: '编剧小林' }, onLogout });
+    expect(screen.getByText('编剧小林')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '退出' }));
+    await waitFor(() => expect(onLogout).toHaveBeenCalledOnce());
   });
 
   it('keeps every process stage visible when IntersectionObserver is unavailable', () => {

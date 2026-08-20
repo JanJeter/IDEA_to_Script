@@ -39,10 +39,23 @@ export class ProjectRetentionService implements OnModuleInit {
         where: {
           lastSeenAt: { lt: visitorCutoff },
           projects: { none: {} },
+          user: null,
         },
       });
+      const now = new Date();
+      const expiredSessions = await this.prisma.authSession.deleteMany({
+        where: {
+          OR: [
+            { expiresAt: { lte: now } },
+            { revokedAt: { lte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) } },
+          ],
+        },
+      });
+      const staleThrottles = await this.prisma.authThrottle.deleteMany({
+        where: { updatedAt: { lt: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) } },
+      });
       this.logger.log(
-        `Retention cleanup completed; deleted ${expired.count} projects and ${orphanedVisitors.count} orphan visitors`,
+        `Retention cleanup completed; deleted ${expired.count} projects, ${orphanedVisitors.count} orphan visitors, ${expiredSessions.count} auth sessions and ${staleThrottles.count} throttle records`,
       );
     });
     this.logger.log('Expired project cleanup worker registered');
