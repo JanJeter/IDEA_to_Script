@@ -14,7 +14,7 @@ http://{$PUBLIC_IP} {
 	}
 }
 
-https:// {
+:443 {
 	tls /etc/letsencrypt/live/{$PUBLIC_IP}/fullchain.pem /etc/letsencrypt/live/{$PUBLIC_IP}/privkey.pem
 	encode zstd gzip
 
