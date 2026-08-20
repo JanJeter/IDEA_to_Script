@@ -1,7 +1,7 @@
 import { ConflictException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { GenerationVersionStatus, Prisma, ProjectStatus, RunStatus } from '@prisma/client';
+import { AgentExecutionError, type AgentRunResult } from '@idea2screenplay/agent';
 import { PremiseAgentService } from '../agent/premise-agent.service';
-import type { StageAgentResult } from '../agent/contracts/stage-agent.types';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   AbuseProtectionService,
@@ -67,7 +67,7 @@ type GenerationProject = Prisma.ProjectGetPayload<{ include: typeof generationPr
 type WorkflowVersion = Prisma.GenerationVersionGetPayload<Record<string, never>>;
 type StageGenerationResult = {
   update: Prisma.GenerationVersionUpdateInput;
-  telemetry?: StageAgentResult;
+  telemetry?: AgentRunResult;
 };
 export type GenerationEventSink = (
   transaction: Prisma.TransactionClient,
@@ -175,6 +175,7 @@ export class GenerationService {
     const previousStage = version.currentStage;
     let runId: string | undefined;
     const providerCalls: LlmCallTelemetry[] = [];
+    let agentTelemetry: AgentRunResult | undefined;
 
     try {
       // Lock the business Job row, verify this worker still owns the exact
@@ -218,6 +219,7 @@ export class GenerationService {
           visitorId,
           onLlmCall: (call) => providerCalls.push(call),
         });
+        agentTelemetry = generated.telemetry;
         this.validateGeneratedStage(stage, generated.update);
       } catch (error) {
         // Output-shape conflicts cannot be repaired by replaying the same paid
@@ -225,6 +227,14 @@ export class GenerationService {
         // keep their original HTTP 409 behavior.
         if (error instanceof LlmRequestError || error instanceof NonRetryableGenerationError) {
           throw error;
+        }
+        if (error instanceof AgentExecutionError) {
+          agentTelemetry = error.telemetry;
+          throw new NonRetryableGenerationError(
+            this.safeAgentFailureMessage(error),
+            'agent_run',
+            error,
+          );
         }
         const message =
           error instanceof ConflictException ? error.message : '模型返回内容不符合当前阶段的数据契约';
@@ -318,7 +328,7 @@ export class GenerationService {
                 status: RunStatus.FAILED,
                 completedAt: new Date(),
                 error: error instanceof Error ? error.message : String(error),
-                ...this.runScalarTelemetry(undefined, providerCalls),
+                ...this.runScalarTelemetry(agentTelemetry, providerCalls),
               },
             });
             if (failedRun.count === 1 && providerCalls.length > 0) {
@@ -636,7 +646,29 @@ export class GenerationService {
     }
   }
 
-  private runTelemetry(agent: StageAgentResult | undefined, calls: LlmCallTelemetry[]) {
+  private safeAgentFailureMessage(error: AgentExecutionError) {
+    switch (error.reason) {
+      case 'timeout':
+        return 'Agent 生成超时，请稍后重试';
+      case 'context_limit':
+        return '输入素材超过当前上下文预算，请缩短素材后重试';
+      case 'token_limit':
+      case 'tool_limit':
+      case 'retry_budget_exhausted':
+        return 'Agent 已达到本次生成预算上限，请重试';
+      case 'cancelled':
+        return 'Agent 生成已取消';
+      case 'loop_detected':
+      case 'step_limit':
+        return 'Agent 未能在限定步骤内完成有效草稿，请重试';
+      case 'provider_error':
+        return '模型服务暂时不可用，请稍后重试';
+      case 'submitted':
+        return 'Agent 结果未能完成保存';
+    }
+  }
+
+  private runTelemetry(agent: AgentRunResult | undefined, calls: LlmCallTelemetry[]) {
     return {
       ...this.runScalarTelemetry(agent, calls),
       providerCalls: calls.length
@@ -647,15 +679,15 @@ export class GenerationService {
     };
   }
 
-  private runScalarTelemetry(agent: StageAgentResult | undefined, calls: LlmCallTelemetry[]) {
+  private runScalarTelemetry(agent: AgentRunResult | undefined, calls: LlmCallTelemetry[]) {
     const promptTokens = agent?.promptTokens ?? this.completeTokenTotal(calls, 'promptTokens');
     const completionTokens =
       agent?.completionTokens ?? this.completeTokenTotal(calls, 'completionTokens');
     return {
-      providerCallCount: agent?.steps ?? calls.length,
-      providerDurationMs: calls.length
-        ? calls.reduce((total, call) => total + call.durationMs, 0)
-        : null,
+      providerCallCount: agent?.providerCalls ?? agent?.steps ?? calls.length,
+      providerDurationMs:
+        agent?.providerDurationMs ??
+        (calls.length ? calls.reduce((total, call) => total + call.durationMs, 0) : null),
       promptTokens,
       completionTokens,
     };

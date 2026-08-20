@@ -13,7 +13,7 @@ RUN npm ci
 COPY . .
 RUN npm run build -w @idea2screenplay/agent \
   && npm run db:generate \
-  && npm run build -w @idea2screenplay/api
+  && npm run build:compiled -w @idea2screenplay/api
 
 FROM base AS production-dependencies
 WORKDIR /app
