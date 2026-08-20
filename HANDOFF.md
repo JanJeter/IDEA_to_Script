@@ -1,7 +1,5 @@
 # Idea2Screenplay 会话交接文档
 
-> **历史快照提醒（2026-08-20）：** 本文主体记录旧访问码/匿名身份阶段。当前代码已改为账号密码注册登录；认证接口、配置与部署要求以 `README.md`、`docs/ARCHITECTURE.md` 和 `docs/IP_DEPLOYMENT.md` 为准。旧 `APP_ACCESS_CODES` 仅在迁移窗口用于历史项目认领。
-
 > **当前权威交接：2026-08-15（Asia/Shanghai）**  
 > 项目路径：`D:\desktop\AI_ScriptTranfer\Idea2Screenplay-source`  
 > 下面的“2026-08-15 P2 上线收口交接”是当前唯一执行基线；P1 最终记录及其后的收口过程与 2026-08-14 旧章节仅作历史背景，其中“仍未完成”“仍要重跑”“先修 120 秒队列延迟”“Token 未记录”“不要使用 Sub-Agent”等陈述已经过时，不得作为下一会话的执行优先级。

@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
-import { AgentModule } from '../agent/agent.module';
+import { AgentModelService } from '../agent/runtime/agent-model.service';
+import { StageAgentRuntimeService } from '../agent/runtime/stage-agent-runtime.service';
+import { StageSkillLoaderService } from '../agent/skills/stage-skill-loader.service';
+import { PremiseAgentService } from '../agent/premise-agent.service';
 import { GenerationController } from './generation.controller';
 import { GenerationJobOwnerGuard } from './generation-job-owner.guard';
 import { GenerationJobsService } from './generation-jobs.service';
@@ -9,7 +12,6 @@ import { LlmService } from './llm.service';
 import { ProjectRetentionService } from './project-retention.service';
 
 @Module({
-  imports: [AgentModule],
   controllers: [GenerationController],
   providers: [
     GenerationService,
@@ -18,6 +20,10 @@ import { ProjectRetentionService } from './project-retention.service';
     GenerationJobOwnerGuard,
     ProjectRetentionService,
     LlmService,
+    AgentModelService,
+    StageAgentRuntimeService,
+    StageSkillLoaderService,
+    PremiseAgentService,
   ],
   exports: [GenerationQueueService, LlmService],
 })

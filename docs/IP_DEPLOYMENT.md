@@ -17,11 +17,9 @@ VISITOR_IDENTITY_KEY=<另用 openssl rand -hex 32 生成；身份建立后不得
 COOKIE_SIGNING_KEY_PREVIOUS=
 IP_HASH_KEY=<使用 openssl rand -hex 32 生成>
 ALTCHA_HMAC_KEY=<使用 openssl rand -hex 32 生成>
-AUTH_THROTTLE_KEY=<使用 openssl rand -hex 32 生成>
-AUTH_SESSION_DAYS=30
 
-# 从旧访问码版本迁移时才保留原值；全新部署留空
-APP_ACCESS_CODES=
+# 先在可信终端执行 npm run access-codes:generate -- 100，再粘贴整行
+APP_ACCESS_CODES=IDS-001-...,...,IDS-100-...
 
 # Phase 0 保持演示生成器，不产生模型费用
 DEMO_MODE=true
@@ -31,9 +29,7 @@ LLM_MODEL=deepseek-chat
 LLM_TIMEOUT_MS=90000
 ```
 
-使用十六进制口令可避免连接 URL 中的特殊字符编码问题。`.env.example` 中所有 `development-...` 密钥都是公开开发值，生产进程会拒绝它们，必须逐项生成独立随机密钥。`DEMO_MODE` 只有规范化后的 `true/false` 合法；只有明确 `false` 且 API Key 非空才允许真实付费调用。
-
-`COOKIE_SIGNING_KEY`、`COOKIE_SIGNING_KEY_PREVIOUS`、`VISITOR_IDENTITY_KEY` 和旧 `APP_ACCESS_CODES` 仅用于迁移同一浏览器中已有的 `ids_visitor` Cookie。迁移窗口结束并确认旧项目均已认领后，可在一次独立发布中删除这组兼容配置；不要在认领前轮换原值。
+使用十六进制口令可避免连接 URL 中的特殊字符编码问题。每位用户分配一个独立访问码；不要共用一个公共码。`.env.example` 中所有 `development-...` 密钥都是公开开发值，生产进程会拒绝它们，必须逐项生成独立随机密钥。`DEMO_MODE` 只有规范化后的 `true/false` 合法；只有明确 `false` 且 API Key 非空才允许真实付费调用。
 
 `.env.production` 不提交到仓库，权限设置为 `chmod 600 .env.production`。该文件只作为 Compose 的运行时 `--env-file` 输入，禁止通过 Dockerfile 的 `COPY`、`ARG` 或 `ENV` 烘焙进镜像；根 `.dockerignore` 已排除 `.env` 和 `.env.*`，详见 `P1-DOCKER-BUILD-SECRET-ISOLATION.md`。
 
@@ -59,7 +55,7 @@ docker compose \
   up -d --build
 ```
 
-此时访问 `http://<PUBLIC_IP>` 只用于确认公开首页、健康检查和 ACME challenge。不要在 HTTP 阶段输入、注册或测试任何真实密码；生产认证 Cookie 强制为 Secure，且 API 只接受配置中的 HTTPS Origin。
+此时访问 `http://<PUBLIC_IP>` 应能看到首页。确认防火墙没有拦截 80 端口。
 
 ## 3. 签发 HTTPS IP 地址证书
 
@@ -173,9 +169,8 @@ API 容器每次启动会先以非 root 身份执行 `prisma migrate deploy`，�
 
 ## 7. Phase 0 验收
 
-- `https://<IP>` 可以注册账号、退出并使用同一账号重新登录。
-- 未登录项目 API 返回 401，错误密码和高频注册/登录会被限流。
-- Cookie 具备 `Secure`、`HttpOnly`、`SameSite=Lax`，数据库只保存会话令牌哈希。
+- `https://<IP>` 打开访问码门禁，有效码可以进入项目首页。
+- 未授权项目 API 返回 401，错误访问码会被限流。
 - 后端或模型不可用时，`/workspace/sample` 仍能浏览完整示例。
 - 刷新 `/workspace/sample` 不返回 404。
 - 手机网络和桌面网络均可访问。

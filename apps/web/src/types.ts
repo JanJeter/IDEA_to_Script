@@ -180,14 +180,9 @@ export type Health = {
   model: string;
 };
 
-export type AuthUser = {
-  id: string;
-  username: string;
-};
-
-export type AuthSession = {
-  authenticated: boolean;
-  user: AuthUser | null;
+export type AccessSession = {
+  required: boolean;
+  authorized: boolean;
 };
 
 export type TrendRiskLevel = 'LOW' | 'REVIEW' | 'BLOCKED';

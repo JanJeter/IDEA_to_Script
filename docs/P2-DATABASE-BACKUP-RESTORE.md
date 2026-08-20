@@ -100,7 +100,7 @@ RESTORE_COOKIE_SIGNING_KEY=<restore-only-random-key-1>
 RESTORE_VISITOR_IDENTITY_KEY=<restore-only-random-key-2>
 RESTORE_IP_HASH_KEY=<restore-only-random-key-3>
 RESTORE_ALTCHA_HMAC_KEY=<restore-only-random-key-4>
-RESTORE_AUTH_THROTTLE_KEY=<restore-only-random-key-5>
+RESTORE_APP_ACCESS_CODE=<restore-only-code>
 ```
 
 不要复用生产业务密钥。先验证 Compose 展开，但不要输出展开后的完整配置：
