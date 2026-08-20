@@ -85,7 +85,7 @@ export function useGenerationJob({ onSucceeded, onFailed }: Options) {
                 'FAILED',
                 projectId,
                 status === 401
-                  ? '登录状态已失效，请重新登录'
+                  ? '访问授权已失效，请重新输入访问码'
                   : '生成任务已不存在或无权访问',
               );
               return;

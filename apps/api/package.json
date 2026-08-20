@@ -3,24 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "prebuild": "npm run build -w @idea2screenplay/agent",
     "build": "nest build",
-    "predev": "npm run build -w @idea2screenplay/agent",
     "dev": "nest start --watch",
     "start": "node dist/main.js",
-    "prelint": "npm run build -w @idea2screenplay/agent",
     "lint": "eslint \"src/**/*.ts\"",
-    "pretest": "npm run build -w @idea2screenplay/agent",
     "test": "jest --runInBand",
     "test:watch": "jest --watch",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
-    "prisma:studio": "prisma studio",
-    "auth:reset-password": "node --env-file-if-exists=../../.env dist/security/reset-user-password.cli.js"
+    "prisma:studio": "prisma studio"
   },
   "dependencies": {
-    "@idea2screenplay/agent": "0.1.0",
     "@ai-sdk/openai": "2.0.44",
     "@nestjs/common": "^11.1.6",
     "@nestjs/config": "^4.0.2",
@@ -30,7 +24,6 @@
     "@prisma/client": "^6.16.2",
     "ai": "5.0.98",
     "altcha-lib": "^2.3.2",
-    "argon2": "^0.45.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
     "pg-boss": "^12.27.0",

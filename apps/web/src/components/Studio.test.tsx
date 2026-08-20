@@ -117,8 +117,7 @@ describe('Studio', () => {
       />,
     );
 
-    fireEvent.click(within(container).getByRole('button', { name: '故事设定' }));
-    fireEvent.click(within(container).getByRole('button', { name: '人物档案' }));
+    fireEvent.click(within(container).getAllByRole('button', { name: /人物档案/ })[0]);
     fireEvent.click(within(container).getByRole('button', { name: '关系图谱' }));
 
     expect(await within(container).findByTestId('character-graph')).toHaveTextContent('1 条关系');

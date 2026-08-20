@@ -12,8 +12,6 @@ describe('ProjectRetentionService', () => {
     const prisma = {
       project: { deleteMany: jest.fn().mockResolvedValue({ count: 2 }) },
       anonymousVisitor: { deleteMany: jest.fn().mockResolvedValue({ count: 3 }) },
-      authSession: { deleteMany: jest.fn().mockResolvedValue({ count: 4 }) },
-      authThrottle: { deleteMany: jest.fn().mockResolvedValue({ count: 5 }) },
     };
     const config = { get: jest.fn((_key, fallback) => fallback) };
     const service = new ProjectRetentionService(prisma as never, queue as never, config as never);
@@ -35,19 +33,7 @@ describe('ProjectRetentionService', () => {
       where: {
         lastSeenAt: { lt: expect.any(Date) },
         projects: { none: {} },
-        user: null,
       },
-    });
-    expect(prisma.authSession.deleteMany).toHaveBeenCalledWith({
-      where: {
-        OR: [
-          { expiresAt: { lte: expect.any(Date) } },
-          { revokedAt: { lte: expect.any(Date) } },
-        ],
-      },
-    });
-    expect(prisma.authThrottle.deleteMany).toHaveBeenCalledWith({
-      where: { updatedAt: { lt: expect.any(Date) } },
     });
   });
 });

@@ -1,30 +1,30 @@
 import { Injectable, NestMiddleware, UnauthorizedException } from '@nestjs/common';
 import type { NextFunction, Response } from 'express';
-import { AuthService } from './auth.service';
 import type { VisitorRequest } from './visitor-request';
+import { VisitorIdentityService } from './visitor-identity.service';
 
 @Injectable()
 export class VisitorMiddleware implements NestMiddleware {
-  constructor(private readonly auth: AuthService) {}
+  constructor(private readonly identity: VisitorIdentityService) {}
 
-  async use(req: VisitorRequest, _res: Response, next: NextFunction) {
+  async use(req: VisitorRequest, res: Response, next: NextFunction) {
     try {
-      req.clientIp = req.ip || req.socket.remoteAddress || 'unknown';
-      const method = (req.method ?? 'GET').toUpperCase();
-      if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
-        this.auth.assertMutationRequest({
-          origin: req.headers.origin,
-          referer: req.headers.referer,
-        });
+      const existingToken = this.identity.readSignedToken(req.headers.cookie);
+      if (this.identity.accessRequired && !this.identity.isAuthorizedToken(existingToken)) {
+        throw new UnauthorizedException('需要有效访问码');
       }
-      const identity = await this.auth.resolveSession(req.headers.cookie);
-      if (!identity) throw new UnauthorizedException('请先登录');
-      req.visitorId = identity.visitorId;
-      req.userId = identity.userId;
-      req.username = identity.username;
+      const token = existingToken ?? this.identity.createAnonymousToken();
+
+      if (!existingToken || this.identity.needsCookieRefresh(req.headers.cookie)) {
+        this.identity.setCookie(res, token);
+      }
+
+      req.visitorId = await this.identity.resolveVisitor(token);
+      req.clientIp = req.ip || req.socket.remoteAddress || 'unknown';
       next();
     } catch (error) {
       next(error);
     }
   }
+
 }
