@@ -151,3 +151,26 @@
 然后在阿里云 ECS 控制台停止实例。确定不再使用时，再释放实例和云盘；释放前先备份需要保留的数据。
 
 注意：不要公开数据库密码、模型 API Key、SSH 密码或 .env.production。
+## One-command ECS deployment
+
+The ECS checkout is connected to the Gitee `master` branch. From the project
+directory on ECS, run:
+
+```bash
+sudo scripts/deploy-ecs.sh
+```
+
+The script pulls with `--ff-only`, refuses to deploy a dirty checkout, creates
+a verified PostgreSQL backup before a code change, builds the production
+images, starts Compose, and waits for PostgreSQL, API, and Web health checks.
+
+For a configuration-only restart that intentionally reuses existing images:
+
+```bash
+sudo scripts/deploy-ecs.sh --skip-build
+```
+
+Keep `.env.production`, `deploy/certbot/conf`, and database backups outside
+Git. If a deployment fails, the script leaves the previous source commit and
+the new images in place for inspection; use the recorded backup and a reviewed
+rollback commit rather than deleting production data.
