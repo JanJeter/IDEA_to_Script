@@ -22,7 +22,7 @@ flowchart LR
   Stage --> Prisma
 ```
 
-`GenerationJobsService` 负责逐阶段任务、确认衔接、持久化事件和 Worker 状态，`GenerationQueueService` 负责 pg-boss。`GenerationService` 每次只执行一个阶段，并管理暂存版本编辑与最终激活。默认 legacy 路径仍由 `LlmService` 负责一次性 JSON 生成；PREMISE 可灰度切换到 `StageAgentRuntimeService`，以每次 Run 独立的工具白名单、显式 Skill、Zod 校验和受控提交完成阶段。Agent 返回的草稿仍由原有 Serializable 事务提交，不直接操作 Prisma。
+`GenerationJobsService` 负责逐阶段任务、确认衔接、持久化事件和 Worker 状态，`GenerationQueueService` 负责 pg-boss。`GenerationService` 每次只执行一个阶段，并管理暂存版本编辑与最终激活。默认 legacy 路径仍由 `LlmService` 负责一次性 JSON 生成；PREMISE 可灰度切换到独立的 `apps/agent` workspace。API 适配器只提供限定项目和版本的结构化 Memory 快照与 Capability，Agent 以每次 Run 独立的工具白名单、显式 Skill、校验和受控提交完成阶段。Agent 返回的草稿仍由原有 Serializable 事务提交，不直接操作 Prisma。
 
 Agent 模式默认关闭。它不注册通用 Bash、文件、MCP、Cron、外部 API 或 Sub-Agent 工具，不使用本地 Session/Memory，也不替代 pg-boss、GenerationVersion 或人工确认工作流。
 

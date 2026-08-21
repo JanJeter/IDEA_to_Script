@@ -50,7 +50,8 @@ export class AgentRuntime {
       controller.abort(new Error('Agent run timed out'));
     }, input.context.budget.maxElapsedMs);
     const forwardAbort = () => controller.abort(input.signal?.reason ?? new Error('Agent run cancelled'));
-    input.signal?.addEventListener('abort', forwardAbort, { once: true });
+    if (input.signal?.aborted) forwardAbort();
+    else input.signal?.addEventListener('abort', forwardAbort, { once: true });
     let messages: ModelMessage[] = [{ role: 'user', content: input.user }];
     let completedSteps = 0;
 
@@ -65,6 +66,9 @@ export class AgentRuntime {
     });
 
     try {
+      if (controller.signal.aborted) {
+        throw controller.signal.reason ?? new Error('Agent run cancelled');
+      }
       for (let step = 1; step <= input.context.budget.maxSteps; step += 1) {
         messages = this.fitMessages(input.system, messages, input.registry, budget);
         const result = await this.executeWithRetry({
@@ -77,7 +81,7 @@ export class AgentRuntime {
           step,
         });
         completedSteps = step;
-        budget.recordStep(result.usage, result.durationMs);
+        budget.recordStep(result.usage);
         messages.push(...result.messages);
 
         for (const call of result.toolCalls) {
@@ -120,6 +124,7 @@ export class AgentRuntime {
     } catch (error) {
       const normalized = this.normalizeError(error, controller.signal.aborted, timedOut);
       const failed = this.result(normalized.reason, completedSteps, input.registry.callCount, budget);
+      normalized.telemetry ??= failed;
       await this.finishTrace(input.context.runId, failed, startedAt);
       throw normalized;
     } finally {
@@ -139,17 +144,24 @@ export class AgentRuntime {
   }) {
     const maxAttempts = input.context.budget.maxProviderAttemptsPerStep;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      if (input.controller.signal.aborted) {
+        throw input.controller.signal.reason ?? new Error('Agent run cancelled');
+      }
       input.budget.beginProviderCall(attempt > 1);
       const mutatingCallsBefore = input.registry.mutatingCallCount;
+      const providerStartedAt = Date.now();
       try {
-        return await this.model.executeStep({
+        const result = await this.model.executeStep({
           system: input.system,
           messages: input.messages,
           tools: input.registry.toAiSdkTools(),
           maxOutputTokens: input.context.budget.maxOutputTokensPerStep,
           signal: input.controller.signal,
         });
+        input.budget.recordProviderDuration(result.durationMs);
+        return result;
       } catch (error) {
+        input.budget.recordProviderDuration(Date.now() - providerStartedAt);
         if (error instanceof AgentExecutionError) throw error;
         if (input.controller.signal.aborted) throw error;
         if (input.registry.mutatingCallCount > mutatingCallsBefore) {

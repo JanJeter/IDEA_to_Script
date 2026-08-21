@@ -7,6 +7,7 @@ export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    files: ['src/**/*.ts'],
     languageOptions: {
       globals: globals.node,
       parserOptions: { project: './tsconfig.json', tsconfigRootDir: import.meta.dirname },
@@ -14,5 +15,9 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
     },
+  },
+  {
+    files: ['scripts/**/*.mjs'],
+    languageOptions: { globals: globals.node },
   },
 );

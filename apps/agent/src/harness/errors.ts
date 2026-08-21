@@ -1,14 +1,18 @@
-import type { AgentFinishReason } from '../contracts/agent.types';
+import type { AgentFinishReason, AgentRunResult } from '../contracts/agent.types';
 
 export class AgentExecutionError extends Error {
   constructor(
     message: string,
     readonly reason: AgentFinishReason,
     readonly originalError?: unknown,
+    telemetry?: AgentRunResult,
   ) {
     super(message);
     this.name = 'AgentExecutionError';
+    this.telemetry = telemetry;
   }
+
+  telemetry?: AgentRunResult;
 }
 
 export class ToolInputValidationError extends Error {
