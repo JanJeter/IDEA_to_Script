@@ -49,10 +49,13 @@ export class AgentBudgetManager {
     if (isRetry) this.retryCount += 1;
   }
 
-  recordStep(usage: AgentStepUsage, durationMs: number) {
+  recordStep(usage: AgentStepUsage) {
     this.prompt += Math.max(0, usage.inputTokens || 0);
     this.completion += Math.max(0, usage.outputTokens || 0);
     this.cached += Math.max(0, usage.cachedInputTokens || 0);
+  }
+
+  recordProviderDuration(durationMs: number) {
     this.providerMs += Math.max(0, durationMs || 0);
   }
 
