@@ -4,6 +4,16 @@
 
 项目借鉴 [Dramatron](https://github.com/google-deepmind/dramatron) 的分层故事生成思想，使用现代 Web 技术重新实现：前端为 React，后端为 NestJS，数据持久化到 PostgreSQL。代码没有复制 Dramatron 实现。
 
+## 产品截图
+
+### 人物关系图谱
+
+![Idea2Screenplay 人物关系图谱](artifacts/character-graph-desktop.png)
+
+### 完整剧本预览
+
+![Idea2Screenplay 完整剧本预览](artifacts/character-profiles.png)
+
 ## 为什么不是“一次 Prompt 写完”
 
 完整剧本直接生成容易出现人物动机漂移、场景重复和前后矛盾。本项目把创作拆成六个有依赖关系、可追踪的阶段：
