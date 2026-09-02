@@ -19,8 +19,8 @@
   --signal-dark: #8f352a;
   --gold: #c5a66a;
   --ui: "Inter", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
-  --display: "Playfair Display", "Songti SC", "STSong", "Noto Serif SC", "SimSun", serif;
-  --script: "Songti SC", "STSong", "Noto Serif SC", "SimSun", serif;
+  --display: "Noto Serif SC", "Songti SC", "STSong", "SimSun", serif;
+  --script: "Noto Serif SC", "Songti SC", "STSong", "SimSun", serif;
   --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
