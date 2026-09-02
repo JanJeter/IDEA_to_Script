@@ -13,8 +13,10 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && node scripts/copy-assets.mjs",
-    "lint": "eslint \"src/**/*.ts\"",
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/watch.mjs --build",
+    "watch": "node scripts/watch.mjs",
+    "lint": "eslint \"src/**/*.ts\" \"scripts/**/*.mjs\"",
     "test": "jest --runInBand"
   },
   "dependencies": {
@@ -23,6 +25,7 @@
     "zod": "3.25.76"
   },
   "devDependencies": {
+    "@ai-sdk/provider": "2.0.0",
     "@eslint/js": "^9.36.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.5.2",

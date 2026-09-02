@@ -17,13 +17,14 @@ describe('AgentBudgetManager', () => {
     const manager = new AgentBudgetManager(budget);
     manager.recordStep(
       { inputTokens: 300, outputTokens: 40, cachedInputTokens: 250 },
-      20,
     );
+    manager.recordProviderDuration(20);
 
     expect(manager.snapshot).toMatchObject({
       promptTokens: 300,
       completionTokens: 40,
       cachedInputTokens: 250,
+      providerDurationMs: 20,
     });
     expect(() => manager.assertCanContinue()).not.toThrow();
   });

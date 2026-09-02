@@ -158,7 +158,10 @@ describe('AgentRuntime', () => {
       modelId: 'test-model',
       available: true,
       executeStep: jest.fn()
-        .mockRejectedValueOnce(new Error('HTTP 503 unavailable'))
+        .mockImplementationOnce(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+          throw new Error('HTTP 503 unavailable');
+        })
         .mockImplementationOnce(async ({ tools }) => {
           await tools.submit.execute({ value: 'draft' });
           return {
@@ -170,13 +173,19 @@ describe('AgentRuntime', () => {
         }),
     };
     const runtime = new AgentRuntime(model, { retryPolicy: new AgentRetryPolicy(0, 0) });
-    await expect(runtime.run({
+    const result = await runtime.run({
       context,
       system: 'test',
       user: 'test',
       registry,
       hasSubmitted: () => submitted,
-    })).resolves.toMatchObject({ providerCalls: 2, retries: 1 });
+    });
+    expect(result).toEqual(expect.objectContaining({
+      providerCalls: 2,
+      retries: 1,
+      providerDurationMs: expect.any(Number),
+    }));
+    expect(result.providerDurationMs).toBeGreaterThan(20);
   });
 
   it('never retries an unknown stream outcome after a mutating tool call', async () => {
@@ -197,8 +206,36 @@ describe('AgentRuntime', () => {
       user: 'test',
       registry,
       hasSubmitted: () => submitted,
-    })).rejects.toMatchObject({ reason: 'provider_error' });
+    })).rejects.toMatchObject({
+      reason: 'provider_error',
+      telemetry: expect.objectContaining({ providerCalls: 1, toolCalls: 1 }),
+    });
     expect(model.executeStep).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not call the provider when the external signal is already aborted', async () => {
+    const registry = submissionRegistry(() => undefined);
+    const model = {
+      modelId: 'test-model',
+      available: true,
+      executeStep: jest.fn(),
+    };
+    const controller = new AbortController();
+    controller.abort(new Error('cancel before run'));
+    const runtime = new AgentRuntime(model);
+
+    await expect(runtime.run({
+      context,
+      system: 'test',
+      user: 'test',
+      registry,
+      hasSubmitted: () => false,
+      signal: controller.signal,
+    })).rejects.toMatchObject({
+      reason: 'cancelled',
+      telemetry: expect.objectContaining({ providerCalls: 0 }),
+    });
+    expect(model.executeStep).not.toHaveBeenCalled();
   });
 
   it('detects repeated tool calls before all steps are consumed', async () => {

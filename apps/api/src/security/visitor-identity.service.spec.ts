@@ -4,6 +4,7 @@ import { VisitorIdentityService } from './visitor-identity.service';
 
 const COOKIE_KEY = 'cookie-signing-key-with-more-than-32-characters';
 const IDENTITY_KEY = 'visitor-identity-key-with-more-than-32-characters';
+const prisma = { anonymousVisitor: { upsert: jest.fn() } } as never;
 
 describe('VisitorIdentityService', () => {
   it('accepts a valid former visitor cookie for project claiming', () => {
@@ -13,6 +14,7 @@ describe('VisitorIdentityService', () => {
       .digest('base64url');
     const service = new VisitorIdentityService(
       new ConfigService({ COOKIE_SIGNING_KEY: COOKIE_KEY, VISITOR_IDENTITY_KEY: IDENTITY_KEY }),
+      prisma,
     );
 
     expect(service.readLegacyToken(`ids_visitor=${token}.${signature}`)).toBe(token);
@@ -36,6 +38,7 @@ describe('VisitorIdentityService', () => {
         VISITOR_IDENTITY_KEY: IDENTITY_KEY,
         APP_ACCESS_CODES: code,
       }),
+      prisma,
     );
 
     expect(service.legacyVisitorTokenHashCandidates(sessionToken)[0]).toBe(expectedHash);
@@ -48,6 +51,7 @@ describe('VisitorIdentityService', () => {
       .digest('hex');
     const service = new VisitorIdentityService(
       new ConfigService({ COOKIE_SIGNING_KEY: COOKIE_KEY, VISITOR_IDENTITY_KEY: IDENTITY_KEY }),
+      prisma,
     );
 
     expect(service.legacyVisitorTokenHashCandidates(token)).toEqual([expectedHash]);
@@ -56,6 +60,7 @@ describe('VisitorIdentityService', () => {
   it('creates opaque, distinct visitor storage hashes for new accounts', () => {
     const service = new VisitorIdentityService(
       new ConfigService({ COOKIE_SIGNING_KEY: COOKIE_KEY, VISITOR_IDENTITY_KEY: IDENTITY_KEY }),
+      prisma,
     );
 
     const first = service.createVisitorTokenHash();
@@ -70,6 +75,7 @@ describe('VisitorIdentityService', () => {
       () =>
         new VisitorIdentityService(
           new ConfigService({ NODE_ENV: 'production', COOKIE_SIGNING_KEY: 'weak' }),
+          prisma,
         ),
     ).toThrow('COOKIE_SIGNING_KEY');
   });
