@@ -25,7 +25,7 @@ git() {
  'merge --ff-only') echo MERGED;;
  esac
 }
-bash() { echo BACKUP; [[ "$CASE" != backup-fail ]]; }
+bash() { cat >/dev/null; echo BACKUP; [[ "$CASE" != backup-fail ]]; }
 docker() {
  if [[ "$1" == inspect ]]; then echo healthy; return; fi
  if [[ "$1" == exec ]]; then echo idea2screenplay; return; fi

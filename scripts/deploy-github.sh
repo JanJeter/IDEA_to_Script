@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Invoked through SSH stdin by the workflow; does not depend on an installed copy.
+# Parse the whole function before running commands that may read stdin.
+main() {
 set -Eeuo pipefail
 umask 077
 
@@ -48,3 +50,6 @@ git merge --ff-only "$target"
 "${compose[@]}" exec -T web wget -q -O /dev/null --no-check-certificate https://127.0.0.1/api/health/ready
 printf 'Deployment healthy: %s\n' "$target"
 # Prisma migrations are applied by the API image at startup. No automatic database rollback.
+
+}
+main "$@" </dev/null
